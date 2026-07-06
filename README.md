@@ -134,15 +134,32 @@ export default defineConfig({
     similarityThreshold: 0.7, // Jaccard similarity for co-clustering
   },
   ai: {
-    enabled: true,            // also needs ANTHROPIC_API_KEY; --no-ai overrides
-    model: 'claude-sonnet-5',
+    enabled: true,            // --no-ai overrides
+    provider: 'auto',         // 'auto' | 'ollama' | 'anthropic'
+    model: 'claude-sonnet-5', // Anthropic model
+    ollama: {
+      baseUrl: 'http://localhost:11434',
+      model: 'llama3.2',
+    },
   },
 });
 ```
 
 ## AI layer
 
-With `ai.enabled` and `ANTHROPIC_API_KEY` set, each cluster gets a one-line hypothesis (`race-condition` / `timeout` / `network` / `environment` / `assertion`) via Claude structured outputs. **AI interprets; it is never the source of truth** — it cannot affect scoring, clustering, cluster ids, or exit codes, and any API failure degrades to a report without hypotheses.
+Each cluster can be annotated with a one-line hypothesis (`race-condition` / `timeout` / `network` / `environment` / `assertion`). **AI interprets; it is never the source of truth** — it cannot affect scoring, clustering, cluster ids, or exit codes, and any provider failure degrades to a report without hypotheses.
+
+### Inference providers — local-first, provider-agnostic
+
+The hypothesis source sits behind a single `HypothesisProvider` interface, so *where* inference runs is an implementation detail the deterministic core never sees. Two providers ship today, chosen by a documented chain (`ai.provider: 'auto'`):
+
+1. **Local Ollama reachable** (`http://localhost:11434` by default) → use it. Runs **entirely on your machine at zero API cost**, nothing leaves the box — the privacy-first default when a local model is present.
+2. **Else `ANTHROPIC_API_KEY` set** → use the Claude API.
+3. **Else** → skip hypotheses (the deterministic report is unchanged).
+
+`--no-ai` forces the whole layer off regardless. Set `ai.provider` to `'ollama'` or `'anthropic'` to pin one explicitly.
+
+This is a separation-of-concerns decision, not a feature bolt-on: adding a provider is implementing one method, selection is an explicit chain, and every failure path (unreachable endpoint, malformed JSON from a small local model, off-schema reply, timeout) degrades to *no hypothesis* with a single warning — the run never hangs or crashes. Small local models are noisier than a hosted model, so that graceful-degradation contract is enforced identically for both providers and covered by tests.
 
 ## Architecture
 
@@ -151,7 +168,8 @@ src/
 ├── ingest/      JUnit XML → canonical TestRun[]; metadata resolution chain
 ├── signal/      flakiness scoring (transition frequency) + regression classifier
 ├── cluster/     THE CORE: trace normalization → similarity → deterministic clustering
-├── ai/          optional Claude interpretation — thin, at the edge, never source of truth
+├── ai/          optional interpretation behind a HypothesisProvider interface
+│                 (Ollama / Anthropic) — thin, at the edge, never source of truth
 ├── config/      flakehound.config.ts via jiti, zod-validated, flag overrides
 ├── report/      terminal report, JSON artifact, baseline diff (CI gate)
 ├── run.ts       pipeline orchestrator (injectable clock/client/streams)
