@@ -1,5 +1,5 @@
 node_modules/
 dist/
-flakehound.report.json
+/flakehound.report.json
 *.log
 .DS_Store

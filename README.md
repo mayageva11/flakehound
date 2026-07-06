@@ -5,6 +5,8 @@
 ![Tests](https://img.shields.io/badge/tests-87%20passing-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
+**Live dashboard:** [mayageva11.github.io/flakehound](https://mayageva11.github.io/flakehound/) — rendered from a real `flakehound.report.json`.
+
 **Root-cause analysis for flaky tests.** Existing tools count pass/fail and tell you *that* a test is flaky — flakehound clusters failures by their underlying cause and tells you **"23 failures over 3 weeks = 4 unique bugs"**, separates genuinely flaky tests from hard regressions, and gates your CI on *new* regressions only.
 
 ```

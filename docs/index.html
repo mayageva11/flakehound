@@ -164,6 +164,14 @@
   .gate-detail .k.new { color: var(--red); } .gate-detail .k.known { color: var(--amber); } .gate-detail .k.res { color: var(--green); }
   .gate-detail .v { color: var(--dim); font-family: var(--mono); font-size: 12.5px; }
 
+  .how { margin-top: 18px; }
+  .how .chain { margin: 0; padding-left: 0; list-style: none; }
+  .how .chain li { margin-bottom: 14px; font-size: 13.5px; color: var(--dim); }
+  .how .chain b { color: var(--text); display: block; margin-bottom: 3px; }
+  .how .fh { background: linear-gradient(90deg, var(--cyan), var(--pink)); -webkit-background-clip: text; background-clip: text; color: transparent; font-family: var(--mono); }
+  .how code { font-family: var(--mono); color: var(--cyan); font-size: 12.5px; }
+  .how .honest { margin: 14px 0 0; padding: 12px 14px; border-left: 3px solid var(--line); background: rgba(7, 9, 15, 0.45); border-radius: 0 10px 10px 0; color: var(--dim); font-size: 12.5px; }
+
   footer { margin-top: 40px; text-align: center; color: var(--dim); font-size: 12.5px; }
   footer a { color: var(--cyan); text-decoration: none; }
 </style>
@@ -177,6 +185,45 @@
   <div class="meta" id="meta"></div>
 
   <div id="app"></div>
+
+  <section class="panel how">
+    <h2><span class="dot" style="background:var(--blue);box-shadow:0 0 8px var(--blue)"></span>How this works — a three-stage chain</h2>
+    <ol class="chain">
+      <li>
+        <b>1 · A test suite runs in CI.</b>
+        Each run produces standard JUnit XML plus a small metadata sidecar
+        (commit SHA, timestamp, runner). The runs accumulate as a history —
+        that history is the only input to the next stage.
+      </li>
+      <li>
+        <b>2 · The <span class="fh">flakehound</span> CLI analyzes the history.</b>
+        Flakiness is scored by pass↔fail <em>transition frequency on the same
+        commit</em> (not naive fail rate); tests failing 100% since a specific
+        commit are separated out as regressions; and failures are clustered by
+        <em>normalized stack trace</em> — volatile tokens (line numbers,
+        memory addresses, durations) are stripped while identity (error
+        classes, function names, status codes) is preserved. Optionally, each
+        cluster's representative trace is sent to Claude for a one-line
+        root-cause hypothesis.
+      </li>
+      <li>
+        <b>3 · This page renders the artifact.</b>
+        The CLI emits <code>flakehound.report.json</code>; this dashboard
+        fetches that file and draws what you see above. Nothing more.
+      </li>
+    </ol>
+    <p class="honest">
+      To be precise about what the tool does and doesn't do: flakehound
+      analyzes <em>test artifacts</em> (JUnit XML) — it never inspects a
+      running website. The AI hypotheses are interpretations layered on top of
+      the deterministic core; they can never affect scores, clusters, or the
+      CI gate. And clustering knows stack traces, not source code — it tells
+      you <em>which failures share a cause</em> and, for regressions,
+      <em>which commit broke them</em>; pointing at the exact source line is
+      an engineer's job (or a hand-written demo annotation, and it will be
+      labeled as such).
+    </p>
+  </section>
 
   <footer>
     generated from <code>flakehound.report.json</code> ·
