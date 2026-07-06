@@ -64,9 +64,19 @@ Drop your JUnit XML files in a folder — flakehound works with zero metadata. A
 2. **Directory name** convention `{sha}_{timestamp}/`, e.g. `a1b2c3d_2026-07-01T10-00/junit.xml`
 3. **File mtime** — timestamp only; commit-aware signals degrade gracefully (flakiness falls back to time-ordered flips at low confidence; regression detection reports `insufficient-metadata` instead of guessing).
 
-## CI recipe (the gate)
+## CI integration
 
-Cache the report artifact between runs and pass it back as the baseline — the gate then fails **once** when a regression lands, not on every run until it's fixed:
+flakehound is CI-agnostic by construction: its only input is JUnit XML — the one format every CI ecosystem already emits (GitHub Actions, Jenkins, GitLab CI, CircleCI, TeamCity, …). There is no per-CI plugin and no per-CI code path. Integrating any CI means expressing three steps in that CI's native idiom:
+
+1. **Run tests → JUnit XML** into a dated history folder (plus the optional metadata sidecar for commit-aware analysis).
+2. **`flakehound analyze`** over the history, with the previous report as `--baseline`.
+3. **Persist `flakehound.report.json`** for the next run, and act on the exit code (`0` clean · `1` new regression · `2` tool error).
+
+The gate then fails **once** when a regression lands — not on every run until it's fixed. Two worked examples:
+
+### GitHub Actions
+
+Baseline persistence via the cache:
 
 ```yaml
 - name: Restore previous flakehound report
@@ -82,7 +92,28 @@ Cache the report artifact between runs and pass it back as the baseline — the 
   with: { path: flakehound.report.json, key: flakehound-report-${{ github.run_id }} }
 ```
 
-No baseline (first run, cache miss)? flakehound **fails safe**: every regression counts as new.
+### Jenkins (declarative pipeline)
+
+Full worked example: [`examples/jenkins/Jenkinsfile`](examples/jenkins/Jenkinsfile) — including writing the metadata sidecar from `$GIT_COMMIT` / `$NODE_NAME`. Baseline persistence uses build artifacts instead of a cache; the essentials:
+
+```groovy
+// previous build's report → this build's baseline (requires the copyartifact plugin)
+copyArtifacts projectName: env.JOB_NAME, selector: lastCompleted(),
+              filter: 'flakehound.report.json', optional: true
+sh 'mv flakehound.report.json flakehound.baseline.json 2>/dev/null || true'
+
+def rc = sh(returnStatus: true, script:
+  "npx flakehound analyze --input 'flakehound-history/**/*.xml' " +
+  "--baseline flakehound.baseline.json --json flakehound.report.json")
+if (rc == 1) { error 'flakehound: new regression detected' }
+else if (rc == 2) { unstable 'flakehound: tool error' }
+
+// post { always { archiveArtifacts artifacts: 'flakehound.report.json', allowEmptyArchive: true } }
+```
+
+The one non-obvious choice is `lastCompleted()` rather than `lastSuccessful()`: a build that failed *because of* a new regression still archived its report, and that report is exactly what turns the regression from "new" (fails every build) into "known" (fails once, stays visible).
+
+No baseline anywhere (first run, cache miss, missing artifact)? flakehound **fails safe**: every regression counts as new.
 
 ## Configuration
 

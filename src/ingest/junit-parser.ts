@@ -149,7 +149,14 @@ function extractFault(testcase: XmlNode): Fault | undefined {
 }
 
 function parseDurationMs(time: string | undefined): number {
-  const seconds = Number(time ?? '0');
+  if (time === undefined) return 0;
+  // Surefire (common in Jenkins ecosystems) can emit locale-formatted times
+  // with thousands separators ("1,024.5"). Strip the commas only when the
+  // value strictly matches that shape, so nothing else is reinterpreted.
+  const normalized = /^\d{1,3}(?:,\d{3})+(?:\.\d+)?$/.test(time)
+    ? time.replaceAll(',', '')
+    : time;
+  const seconds = Number(normalized);
   return Number.isFinite(seconds) ? Math.round(seconds * 1000) : 0;
 }
 

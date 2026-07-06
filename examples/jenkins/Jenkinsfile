@@ -1,0 +1,104 @@
+// flakehound in a Jenkins declarative pipeline.
+//
+// flakehound consumes JUnit XML — the format every CI ecosystem already
+// emits — so there is no Jenkins-specific integration code in the tool.
+// This file IS the whole integration: produce XML, record it as history
+// with a metadata sidecar, analyze with a baseline, act on the exit code.
+//
+// Requires the `copyartifact` plugin (for baseline persistence, see below).
+
+pipeline {
+  // History accumulates in the workspace: pin a fixed agent/label so runs
+  // build up. On ephemeral agents, archive/restore flakehound-history/
+  // alongside the report instead.
+  agent { label 'linux' }
+
+  options { timestamps() }
+
+  stages {
+    stage('Test') {
+      steps {
+        sh 'npm ci'
+        // Produce JUnit XML. Do NOT fail the stage on test failures —
+        // failures are flakehound's *input*; the gate decides at the end.
+        sh 'npm test -- --reporters=junit --outputFile=test-results/junit.xml || true'
+        // Jenkins' own test trend UI — independent of the flakehound gate.
+        junit testResults: 'test-results/junit.xml', allowEmptyResults: true
+      }
+    }
+
+    stage('Record run history') {
+      steps {
+        // One dated folder per build + a junit.meta.json sidecar — this is
+        // flakehound's documented metadata contract. The sidecar (built from
+        // Jenkins env vars) makes the analysis commit-aware: flakiness =
+        // pass/fail flips on the SAME commit; regressions get pinned to the
+        // commit that broke them.
+        sh '''
+          RUN_DIR="flakehound-history/${GIT_COMMIT}_$(date -u +%Y-%m-%dT%H-%M-%S)"
+          mkdir -p "$RUN_DIR"
+          cp test-results/junit.xml "$RUN_DIR/junit.xml"
+          cat > "$RUN_DIR/junit.meta.json" <<EOF
+{
+  "commitSha": "${GIT_COMMIT}",
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "runnerId": "${NODE_NAME}"
+}
+EOF
+        '''
+      }
+    }
+
+    stage('flakehound gate') {
+      steps {
+        // ── Baseline persistence, the Jenkins way ──────────────────────
+        // GitHub Actions uses a cache for this; in Jenkins the natural
+        // mechanism is build artifacts: every build archives its report
+        // (post { always } below), and the next build copies the previous
+        // build's report back as the --baseline.
+        //
+        // lastCompleted() — NOT lastSuccessful() — is deliberate: a build
+        // that failed BECAUSE of a new regression still archived a report,
+        // and that report is exactly what turns the regression from "new"
+        // (fails every build) into "known" (fails once, stays visible).
+        //
+        // optional: true covers the very first build: with no baseline,
+        // flakehound fails safe — every regression counts as new.
+        copyArtifacts projectName: env.JOB_NAME,
+                      selector: lastCompleted(),
+                      filter: 'flakehound.report.json',
+                      optional: true
+        sh 'mv flakehound.report.json flakehound.baseline.json 2>/dev/null || true'
+
+        script {
+          def rc = sh(returnStatus: true, script: '''
+            npx flakehound analyze \
+              --input 'flakehound-history/**/*.xml' \
+              --baseline flakehound.baseline.json \
+              --json flakehound.report.json \
+              --no-ai
+          ''')
+          // The exit code is the whole gate contract:
+          //   0 — clean (or only known/resolved regressions)
+          //   1 — NEW regression detected → fail the build
+          //   2 — tool error (bad XML, bad config) → mark UNSTABLE, not
+          //       FAILED: a broken analyzer is not a broken product, and
+          //       the two must stay distinguishable in the build history.
+          if (rc == 1) {
+            error 'flakehound: new regression detected — see flakehound.report.json artifact'
+          } else if (rc == 2) {
+            unstable 'flakehound: tool error (could not analyze) — check the build log'
+          }
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      // Archive even when the gate failed — the NEXT build needs this
+      // report as its baseline (see lastCompleted() above).
+      archiveArtifacts artifacts: 'flakehound.report.json', allowEmptyArchive: true
+    }
+  }
+}

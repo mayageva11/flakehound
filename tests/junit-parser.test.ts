@@ -57,6 +57,43 @@ describe('parseJUnitXml', () => {
     expect(errored.stackTrace).toContain('psycopg2.connect');
   });
 
+  it('parses Jenkins/Surefire-style reports: properties block, CDATA stacks, entity-encoded messages', () => {
+    const runs = parseJUnitXml(fixture('jenkins-surefire.xml'), sidecarMeta);
+
+    expect(runs).toHaveLength(4);
+    expect(runs.map((r) => r.status)).toEqual(['pass', 'fail', 'fail', 'skip']);
+
+    // classname === suite name (Surefire convention) → deduped in the testId
+    expect(runs[1]!.testId).toBe('com.example.shop.CheckoutServiceTest > appliesCoupon');
+
+    // entity-encoded message attribute is decoded
+    expect(runs[1]!.errorMessage).toBe('expected:<100> but was:<95>');
+    // CDATA stack survives intact
+    expect(runs[1]!.stackTrace).toContain('CheckoutServiceTest.java:57');
+    expect(runs[1]!.stackTrace).toContain('java.lang.AssertionError');
+
+    // <error> variant with CDATA
+    expect(runs[2]!.errorMessage).toBe('Timed out waiting for payment gateway');
+    expect(runs[2]!.stackTrace).toContain('PaymentClient.java:112');
+  });
+
+  it('normalizes Surefire locale thousands separators in time attributes ("1,024.5")', () => {
+    const runs = parseJUnitXml(fixture('jenkins-surefire.xml'), sidecarMeta);
+    expect(runs[0]!.durationMs).toBe(1_024_500);
+    expect(runs[1]!.durationMs).toBe(231);
+  });
+
+  it('does not misread "1,5" (short comma form) as a thousands separator', () => {
+    const xml =
+      '<testsuite name="s" tests="1"><testcase classname="s" name="t" time="1,5"/></testsuite>';
+    const runs = parseJUnitXml(xml, mtimeMeta);
+    // "1,5" doesn't match the strict \d{1,3}(,\d{3})+ thousands shape, so the
+    // comma is NOT stripped — the value is ambiguous (European decimal 1.5?)
+    // and falls back to 0 rather than being misinterpreted as 15 seconds.
+    expect(runs[0]!.durationMs).toBe(0);
+    expect(runs[0]!.status).toBe('pass'); // the run itself still parses fine
+  });
+
   it('prefers the <testsuite timestamp> attribute only when metadata came from mtime', () => {
     const fromMtime = parseJUnitXml(fixture('jest.xml'), mtimeMeta);
     expect(fromMtime[0]!.timestamp).toBe('2026-07-01T10:00:00.000Z');

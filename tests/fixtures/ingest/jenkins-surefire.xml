@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.shop.CheckoutServiceTest" time="1,054.7" tests="4" errors="1" skipped="1" failures="1" timestamp="2026-07-04T10:00:00">
+  <properties>
+    <property name="java.runtime.name" value="OpenJDK Runtime Environment"/>
+    <property name="os.name" value="Linux"/>
+    <property name="surefire.real.class.path" value="/home/jenkins/agent/workspace/shop/target/surefire/surefirebooter.jar"/>
+  </properties>
+  <testcase name="completesPayment" classname="com.example.shop.CheckoutServiceTest" time="1,024.5"/>
+  <testcase name="appliesCoupon" classname="com.example.shop.CheckoutServiceTest" time="0.231">
+    <failure message="expected:&lt;100&gt; but was:&lt;95&gt;" type="java.lang.AssertionError"><![CDATA[java.lang.AssertionError: expected:<100> but was:<95>
+	at org.junit.Assert.fail(Assert.java:89)
+	at com.example.shop.CheckoutServiceTest.appliesCoupon(CheckoutServiceTest.java:57)
+]]></failure>
+  </testcase>
+  <testcase name="handlesGatewayTimeout" classname="com.example.shop.CheckoutServiceTest" time="30.001">
+    <error message="Timed out waiting for payment gateway" type="java.util.concurrent.TimeoutException"><![CDATA[java.util.concurrent.TimeoutException: Timed out waiting for payment gateway
+	at com.example.shop.PaymentClient.charge(PaymentClient.java:112)
+]]></error>
+  </testcase>
+  <testcase name="legacyCheckoutFlow" classname="com.example.shop.CheckoutServiceTest" time="0">
+    <skipped message="deprecated flow"/>
+  </testcase>
+  <system-out><![CDATA[[INFO] payment sandbox ready]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
