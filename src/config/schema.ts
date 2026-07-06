@@ -24,9 +24,20 @@ export const configSchema = z.object({
   ai: z
     .object({
       enabled: z.boolean().default(true),
+      /**
+       * Hypothesis source. 'auto' prefers a reachable local Ollama, then a
+       * configured Anthropic key, else skips. 'ollama' / 'anthropic' force one.
+       */
+      provider: z.enum(['auto', 'anthropic', 'ollama']).default('auto'),
       model: z.string().min(1).default('claude-sonnet-5'),
       maxTokens: z.number().int().positive().default(1024),
       concurrency: z.number().int().min(1).max(8).default(2),
+      ollama: z
+        .object({
+          baseUrl: z.string().min(1).default('http://localhost:11434'),
+          model: z.string().min(1).default('llama3.2'),
+        })
+        .prefault({}),
     })
     .prefault({}),
   /** Previous flakehound.report.json for the CI gate. */

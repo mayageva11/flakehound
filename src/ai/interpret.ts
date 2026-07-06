@@ -1,32 +1,13 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
-import { z } from 'zod';
 import type { FailureCluster } from '../cluster/index.js';
-import { DEFAULT_AI_CONFIG, HYPOTHESIS_CATEGORIES } from './types.js';
-import type { AiConfig, ClusterHypothesis, InterpretedCluster } from './types.js';
+import { AnthropicProvider } from './anthropic-provider.js';
+import type { HypothesisClient } from './anthropic-provider.js';
+import { OllamaProvider } from './ollama-provider.js';
+import type { FetchLike } from './ollama-provider.js';
+import { DEFAULT_AI_CONFIG } from './types.js';
+import type { AiConfig, HypothesisProvider, InterpretedCluster } from './types.js';
 
-const hypothesisSchema = z.object({
-  category: z.enum(HYPOTHESIS_CATEGORIES),
-  explanation: z
-    .string()
-    .min(1)
-    .describe('One concise line explaining the most likely root cause.'),
-});
-
-/**
- * The slice of the Anthropic client this layer uses — injectable so tests
- * run fully mocked, with zero network access.
- */
-export interface HypothesisClient {
-  messages: {
-    parse(params: {
-      model: string;
-      max_tokens: number;
-      messages: { role: 'user'; content: string }[];
-      output_config: { format: unknown };
-    }): Promise<{ parsed_output: unknown }>;
-  };
-}
+export type { HypothesisClient } from './anthropic-provider.js';
 
 export interface InterpretOptions {
   config?: Partial<AiConfig>;
@@ -35,20 +16,91 @@ export interface InterpretOptions {
    * Pass null to force "no key" (used by tests to pin the skip path).
    */
   apiKey?: string | null;
+  /**
+   * An Anthropic client. Injecting one is an explicit "use Anthropic" choice: it
+   * selects the Anthropic provider and skips the Ollama reachability probe (so
+   * existing behavior and tests are unaffected, even where Ollama is running).
+   */
   client?: HypothesisClient;
+  /** An explicit provider instance — highest precedence (embedders, tests). */
+  provider?: HypothesisProvider;
+  /** Injectable fetch for the Ollama provider/probe; defaults to global fetch. */
+  fetch?: FetchLike;
   warn?: (message: string) => void;
   info?: (message: string) => void;
 }
 
 /**
+ * Choose the hypothesis provider from config + environment. Documented chain:
+ *   0. options.provider ....... explicit instance wins
+ *   1. options.client ......... explicit Anthropic wiring (honors the key gate)
+ *   2. config.provider = 'ollama' | 'anthropic' ... use it directly
+ *   3. config.provider = 'auto' (default):
+ *        local Ollama reachable → Ollama
+ *        else ANTHROPIC_API_KEY set → Anthropic
+ *        else → undefined (skip, one quiet info line)
+ * Returns undefined when no provider is available; never throws.
+ */
+export async function resolveProvider(
+  config: AiConfig,
+  options: InterpretOptions = {},
+): Promise<HypothesisProvider | undefined> {
+  const warn = options.warn ?? ((message: string) => console.error(message));
+  const info = options.info ?? ((message: string) => console.error(message));
+
+  if (options.provider !== undefined) return options.provider;
+
+  const apiKey =
+    options.apiKey === null ? undefined : (options.apiKey ?? process.env['ANTHROPIC_API_KEY']);
+  const fetchImpl = options.fetch ?? (globalThis.fetch as unknown as FetchLike);
+
+  // Injected Anthropic client = explicit Anthropic wiring; no Ollama probe.
+  if (options.client !== undefined) {
+    return anthropicOrSkip(options.client, config, apiKey, warn, info);
+  }
+
+  switch (config.provider) {
+    case 'ollama':
+      info(`flakehound: interpreting clusters with the local Ollama model (${config.ollama.model})`);
+      return new OllamaProvider(config.ollama, fetchImpl, warn);
+    case 'anthropic':
+      return anthropicOrSkip(undefined, config, apiKey, warn, info);
+    case 'auto':
+    default:
+      if (await OllamaProvider.isReachable(config.ollama, fetchImpl)) {
+        info(
+          `flakehound: local Ollama reachable — interpreting clusters with ${config.ollama.model} (no API cost)`,
+        );
+        return new OllamaProvider(config.ollama, fetchImpl, warn);
+      }
+      return anthropicOrSkip(undefined, config, apiKey, warn, info);
+  }
+}
+
+function anthropicOrSkip(
+  client: HypothesisClient | undefined,
+  config: AiConfig,
+  apiKey: string | undefined,
+  warn: (message: string) => void,
+  info: (message: string) => void,
+): HypothesisProvider | undefined {
+  if (apiKey === undefined) {
+    info('flakehound: AI interpretation skipped — ANTHROPIC_API_KEY is not set');
+    return undefined;
+  }
+  const resolved = client ?? (new Anthropic({ apiKey }) as unknown as HypothesisClient);
+  return new AnthropicProvider(resolved, config, warn);
+}
+
+/**
  * Optionally annotate clusters with a one-line root-cause hypothesis.
  *
- * Thin, optional, at the edge: runs only when config.ai.enabled AND an API
- * key is present. Every failure (network, rate limit, malformed output) is
- * caught per-cluster — that cluster ships without a hypothesis and the run
- * continues. This function never throws, never reorders or mutates
- * clusters, and has no influence on scoring, clustering, ids, or exit
- * codes.
+ * Thin, optional, at the edge: runs only when config.ai.enabled AND a provider
+ * is available. Every failure is caught per-cluster — that cluster ships without
+ * a hypothesis and the run continues. This function never throws, never reorders
+ * or mutates clusters, and has no influence on scoring, clustering, ids, or exit
+ * codes — regardless of which provider produced (or failed to produce) a
+ * hypothesis.
  */
 export async function interpretClusters(
   clusters: FailureCluster[],
@@ -62,78 +114,19 @@ export async function interpretClusters(
     return clusters.map((cluster) => ({ ...cluster }));
   }
 
-  const apiKey =
-    options.apiKey === null
-      ? undefined
-      : (options.apiKey ?? process.env['ANTHROPIC_API_KEY']);
-  if (apiKey === undefined) {
-    info('flakehound: AI interpretation skipped — ANTHROPIC_API_KEY is not set');
+  const provider = await resolveProvider(config, { ...options, warn, info });
+  if (provider === undefined) {
     return clusters.map((cluster) => ({ ...cluster }));
   }
 
-  // The structural HypothesisClient interface is narrower than the SDK
-  // client's parse signature; the cast bridges the two.
-  const client =
-    options.client ?? (new Anthropic({ apiKey }) as unknown as HypothesisClient);
-
   const hypotheses = await mapWithConcurrency(clusters, config.concurrency, (cluster) =>
-    interpretOne(client, cluster, config, warn),
+    provider.interpret(cluster),
   );
 
   return clusters.map((cluster, index) => {
     const hypothesis = hypotheses[index];
     return hypothesis !== undefined ? { ...cluster, hypothesis } : { ...cluster };
   });
-}
-
-async function interpretOne(
-  client: HypothesisClient,
-  cluster: FailureCluster,
-  config: AiConfig,
-  warn: (message: string) => void,
-): Promise<ClusterHypothesis | undefined> {
-  try {
-    // claude-sonnet-5 runs adaptive-thinking-only and rejects non-default
-    // sampling parameters — send only model, max_tokens, messages, and the
-    // structured-output format.
-    const response = await client.messages.parse({
-      model: config.model,
-      max_tokens: config.maxTokens,
-      messages: [{ role: 'user', content: buildPrompt(cluster) }],
-      output_config: { format: zodOutputFormat(hypothesisSchema) },
-    });
-    const parsed = hypothesisSchema.safeParse(response.parsed_output);
-    if (!parsed.success) {
-      warn(
-        `flakehound: AI interpretation for cluster ${cluster.id} returned an off-schema response — continuing without a hypothesis`,
-      );
-      return undefined;
-    }
-    return parsed.data;
-  } catch (cause) {
-    const detail = cause instanceof Error ? cause.message : String(cause);
-    warn(
-      `flakehound: AI interpretation failed for cluster ${cluster.id}: ${detail} — continuing without a hypothesis`,
-    );
-    return undefined;
-  }
-}
-
-function buildPrompt(cluster: FailureCluster): string {
-  const tests = cluster.tests.map((testId) => `- ${testId}`).join('\n');
-  return [
-    'You are analyzing a cluster of CI test failures that share the same underlying cause.',
-    '',
-    'Representative failure trace (normalized: volatile tokens like line numbers, addresses, and durations are replaced with placeholders):',
-    cluster.representativeTrace,
-    '',
-    `Affected tests (${cluster.tests.length}):`,
-    tests,
-    '',
-    `Observed ${cluster.occurrences} time(s) between ${cluster.firstSeen} and ${cluster.lastSeen}.`,
-    '',
-    'Classify the most likely root cause into one category and give a one-line explanation.',
-  ].join('\n');
 }
 
 async function mapWithConcurrency<T, R>(
