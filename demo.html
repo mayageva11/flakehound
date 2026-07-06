@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>flakehound — root-cause analysis for flaky tests</title>
+<style>
+  :root {
+    --bg: #07090f;
+    --panel: #0d1220;
+    --panel-2: #0f1526;
+    --line: #1c2740;
+    --text: #dbe4f3;
+    --dim: #8193b2;
+    --cyan: #22d3ee;
+    --pink: #f472b6;
+    --green: #34d399;
+    --red: #fb7185;
+    --amber: #fbbf24;
+    --violet: #a78bfa;
+    --blue: #60a5fa;
+    --mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(34, 211, 238, 0.07), transparent 60%),
+      radial-gradient(900px 500px at 10% 110%, rgba(244, 114, 182, 0.06), transparent 60%),
+      var(--bg);
+    color: var(--text);
+    font: 15px/1.55 -apple-system, "Segoe UI", Inter, Roboto, sans-serif;
+    min-height: 100vh;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 40px 24px 80px; }
+
+  /* ── header ─────────────────────────────────────────── */
+  header { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  .logo {
+    font-family: var(--mono); font-size: 30px; font-weight: 700; letter-spacing: -0.5px;
+    background: linear-gradient(90deg, var(--cyan), var(--pink));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    text-shadow: 0 0 30px rgba(34, 211, 238, 0.25);
+  }
+  .tagline { color: var(--dim); font-size: 14px; }
+  .meta { margin-top: 6px; color: var(--dim); font-size: 13px; font-family: var(--mono); }
+  .meta .src { border: 1px solid var(--line); border-radius: 20px; padding: 2px 10px; margin-left: 8px; }
+
+  /* ── gate banner ────────────────────────────────────── */
+  .gate {
+    margin-top: 26px; border-radius: 14px; padding: 22px 26px;
+    display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+    border: 1px solid; font-size: 15px;
+  }
+  .gate .verdict { font-size: 22px; font-weight: 800; letter-spacing: 0.3px; }
+  .gate .sub { color: var(--dim); font-size: 13px; }
+  .gate.fail {
+    border-color: rgba(251, 113, 133, 0.5);
+    background: linear-gradient(180deg, rgba(251, 113, 133, 0.10), rgba(251, 113, 133, 0.03));
+    box-shadow: 0 0 40px rgba(251, 113, 133, 0.12), inset 0 0 24px rgba(251, 113, 133, 0.05);
+  }
+  .gate.fail .verdict { color: var(--red); text-shadow: 0 0 18px rgba(251, 113, 133, 0.5); }
+  .gate.pass {
+    border-color: rgba(52, 211, 153, 0.5);
+    background: linear-gradient(180deg, rgba(52, 211, 153, 0.10), rgba(52, 211, 153, 0.03));
+    box-shadow: 0 0 40px rgba(52, 211, 153, 0.10), inset 0 0 24px rgba(52, 211, 153, 0.05);
+  }
+  .gate.pass .verdict { color: var(--green); text-shadow: 0 0 18px rgba(52, 211, 153, 0.5); }
+  .gate .counts { margin-left: auto; display: flex; gap: 10px; font-family: var(--mono); font-size: 13px; }
+  .gate .counts span { border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; background: rgba(13, 18, 32, 0.6); }
+
+  /* ── headline ───────────────────────────────────────── */
+  .headline { margin: 34px 0 8px; text-align: center; }
+  .headline .big { font-size: 34px; font-weight: 800; }
+  .headline .big b { font-family: var(--mono); }
+  .headline .big .n-fail { color: var(--pink); text-shadow: 0 0 24px rgba(244, 114, 182, 0.45); }
+  .headline .big .n-bugs { color: var(--cyan); text-shadow: 0 0 24px rgba(34, 211, 238, 0.45); }
+  .headline .why { color: var(--dim); font-size: 13px; margin-top: 4px; }
+
+  /* ── panels & grid ──────────────────────────────────── */
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 26px; }
+  @media (max-width: 820px) { .grid { grid-template-columns: 1fr; } }
+  section.panel {
+    background: linear-gradient(180deg, var(--panel), var(--panel-2));
+    border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px;
+  }
+  h2 {
+    margin: 0 0 14px; font-size: 12px; font-weight: 700; letter-spacing: 2.2px;
+    text-transform: uppercase; color: var(--dim); display: flex; align-items: center; gap: 8px;
+  }
+  h2 .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .empty { color: var(--dim); font-size: 13px; padding: 8px 0; }
+  .empty.good { color: var(--green); }
+
+  /* ── regression / flaky cards ───────────────────────── */
+  .card { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; background: rgba(7, 9, 15, 0.45); }
+  .card:last-child { margin-bottom: 0; }
+  .card .tid { font-family: var(--mono); font-size: 13.5px; }
+  .card .reason { color: var(--dim); font-size: 12.5px; margin-top: 5px; }
+  .card.reg { border-left: 3px solid var(--red); }
+  .card.reg .since { color: var(--red); font-family: var(--mono); font-size: 12.5px; margin-top: 5px; }
+  .card.flk { border-left: 3px solid var(--amber); }
+  .scorebar { margin-top: 9px; display: flex; align-items: center; gap: 10px; }
+  .scorebar .track { flex: 1; height: 7px; border-radius: 4px; background: #131c30; overflow: hidden; }
+  .scorebar .fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--cyan), var(--pink)); box-shadow: 0 0 12px rgba(244, 114, 182, 0.5); }
+  .scorebar .val { font-family: var(--mono); font-size: 12.5px; color: var(--pink); min-width: 34px; text-align: right; }
+
+  .chip {
+    display: inline-block; font-family: var(--mono); font-size: 11px; letter-spacing: 0.5px;
+    border: 1px solid; border-radius: 20px; padding: 1.5px 9px; vertical-align: middle;
+  }
+  .chip.high { color: var(--green); border-color: rgba(52,211,153,.45); background: rgba(52,211,153,.08); }
+  .chip.medium { color: var(--amber); border-color: rgba(251,191,36,.45); background: rgba(251,191,36,.08); }
+  .chip.low { color: var(--dim); border-color: var(--line); background: rgba(129,147,178,.06); }
+
+  /* ── clusters ───────────────────────────────────────── */
+  .clusters { margin-top: 18px; }
+  details.cluster {
+    border: 1px solid var(--line); border-radius: 12px; margin-bottom: 12px;
+    background: rgba(7, 9, 15, 0.45); overflow: hidden;
+  }
+  details.cluster[open] { border-color: rgba(34, 211, 238, 0.35); box-shadow: 0 0 24px rgba(34, 211, 238, 0.06); }
+  summary { list-style: none; cursor: pointer; padding: 14px 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  summary::-webkit-details-marker { display: none; }
+  summary .rank { font-family: var(--mono); color: var(--dim); font-size: 13px; }
+  summary .caret { color: var(--cyan); transition: transform .15s; font-size: 11px; }
+  details[open] summary .caret { transform: rotate(90deg); }
+  summary .head { font-family: var(--mono); font-size: 13.5px; flex: 1; min-width: 220px; }
+  summary .occ { font-family: var(--mono); font-size: 12.5px; color: var(--pink); border: 1px solid rgba(244,114,182,.4); border-radius: 8px; padding: 2px 9px; background: rgba(244,114,182,.07); }
+  summary .cid { font-family: var(--mono); font-size: 11.5px; color: var(--dim); }
+  .cluster .body { padding: 2px 16px 16px; border-top: 1px dashed var(--line); }
+  .hyp { display: flex; align-items: baseline; gap: 10px; margin: 12px 0 4px; flex-wrap: wrap; }
+  .hyp .cat { font-family: var(--mono); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; border: 1px solid; border-radius: 20px; padding: 2px 10px; }
+  .hyp .exp { font-size: 13.5px; color: var(--text); }
+  .hyp .ai-tag { font-size: 10.5px; color: var(--dim); font-family: var(--mono); }
+  pre.trace {
+    margin: 12px 0 4px; padding: 12px 14px; border-radius: 10px; overflow-x: auto;
+    background: #060810; border: 1px solid var(--line);
+    font-family: var(--mono); font-size: 12.5px; line-height: 1.6; color: #b7c5de;
+  }
+  pre.trace .ph { color: var(--pink); background: rgba(244,114,182,.1); border-radius: 4px; padding: 0 3px; }
+  pre.trace .errcls { color: var(--red); font-weight: 700; }
+  .affected { color: var(--dim); font-size: 12.5px; margin-top: 10px; }
+  .affected code { font-family: var(--mono); color: var(--text); }
+
+  /* ── timeline ───────────────────────────────────────── */
+  .tl-row { display: grid; grid-template-columns: 170px 1fr; gap: 12px; align-items: center; margin-bottom: 10px; }
+  .tl-label { font-family: var(--mono); font-size: 12px; color: var(--dim); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tl-track { position: relative; height: 14px; background: #0a1020; border-radius: 7px; border: 1px solid var(--line); }
+  .tl-bar { position: absolute; top: 2px; bottom: 2px; border-radius: 5px; background: linear-gradient(90deg, var(--cyan), var(--violet)); box-shadow: 0 0 14px rgba(34,211,238,.35); }
+  .tl-axis { display: flex; justify-content: space-between; margin-top: 6px; margin-left: 182px; color: var(--dim); font-family: var(--mono); font-size: 11px; }
+
+  /* ── donut ──────────────────────────────────────────── */
+  .bottom { display: grid; grid-template-columns: 320px 1fr; gap: 18px; margin-top: 18px; }
+  @media (max-width: 820px) { .bottom { grid-template-columns: 1fr; } }
+  .donut-wrap { display: flex; align-items: center; gap: 18px; }
+  .legend { font-size: 12.5px; }
+  .legend div { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; color: var(--dim); }
+  .legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+  .legend b { color: var(--text); font-family: var(--mono); font-weight: 600; }
+  .gate-detail { font-size: 13px; }
+  .gate-detail .row { display: flex; gap: 10px; margin-bottom: 8px; align-items: baseline; }
+  .gate-detail .k { font-family: var(--mono); font-size: 12px; min-width: 76px; }
+  .gate-detail .k.new { color: var(--red); } .gate-detail .k.known { color: var(--amber); } .gate-detail .k.res { color: var(--green); }
+  .gate-detail .v { color: var(--dim); font-family: var(--mono); font-size: 12.5px; }
+
+  footer { margin-top: 40px; text-align: center; color: var(--dim); font-size: 12.5px; }
+  footer a { color: var(--cyan); text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="logo">flakehound</span>
+    <span class="tagline">root-cause analysis for flaky tests</span>
+  </header>
+  <div class="meta" id="meta"></div>
+
+  <div id="app"></div>
+
+  <footer>
+    generated from <code>flakehound.report.json</code> ·
+    <a href="https://github.com/mayageva11/flakehound">github.com/mayageva11/flakehound</a>
+  </footer>
+</div>
+
+<script>
+/* Inline fallback so the page renders with zero setup (file:// blocks fetch).
+   NOTE: the two `hypothesis` objects below are illustrative sample data added
+   for the visual preview — a fetched report shows whatever the AI layer
+   actually produced (or no chip at all when it was disabled). */
+const FALLBACK_REPORT = {
+  "version": 1,
+  "generatedAt": "2026-07-06T07:59:22.945Z",
+  "summary": {
+    "filesParsed": 4,
+    "testRuns": 12,
+    "metadataSources": { "sidecar": 0, "dirname": 4, "mtime": 0 },
+    "testsAnalyzed": 3
+  },
+  "signals": [
+    {
+      "testId": "shop.spec.ts > checkout",
+      "flakinessScore": 1,
+      "classification": "flaky",
+      "confidence": "medium",
+      "reason": "1 pass↔fail transition(s) on the same commit"
+    },
+    {
+      "testId": "shop.spec.ts > login",
+      "flakinessScore": 0,
+      "classification": "stable",
+      "confidence": "high"
+    },
+    {
+      "testId": "shop.spec.ts > payment",
+      "flakinessScore": 0,
+      "classification": "regression",
+      "confidence": "high",
+      "reason": "failing in 100% of the last 3 run(s) since commit bbb2222; passed before it",
+      "brokenSinceSha": "bbb2222"
+    }
+  ],
+  "clusters": [
+    {
+      "id": "7a7c11808d52",
+      "representativeTrace": "AssertionError: expected cart total to equal charged amount at PaymentPage.verify (payment-page.ts:<N>:<N>)",
+      "tests": ["shop.spec.ts > payment"],
+      "firstSeen": "2026-07-02T10:00:00.000Z",
+      "lastSeen": "2026-07-04T10:00:00.000Z",
+      "occurrences": 3,
+      "hypothesis": {
+        "category": "assertion",
+        "explanation": "Cart total and charged amount diverge consistently, pointing at a real pricing defect rather than test noise."
+      }
+    },
+    {
+      "id": "a8a64e2d45ec",
+      "representativeTrace": "TimeoutError: Timeout <DURATION> exceeded waiting for locator('#pay-button') at CheckoutPage.pay (checkout-page.ts:<N>:<N>)",
+      "tests": ["shop.spec.ts > checkout"],
+      "firstSeen": "2026-07-02T10:00:00.000Z",
+      "lastSeen": "2026-07-04T10:00:00.000Z",
+      "occurrences": 2,
+      "hypothesis": {
+        "category": "timeout",
+        "explanation": "The #pay-button locator intermittently never renders within the wait budget — a slow payment widget under CI load."
+      }
+    }
+  ],
+  "gate": {
+    "baselineUsed": false,
+    "newRegressions": ["shop.spec.ts > payment"],
+    "knownRegressions": [],
+    "resolvedRegressions": []
+  }
+};
+
+const CATEGORY_COLORS = {
+  'race-condition': 'var(--pink)',
+  'timeout': 'var(--amber)',
+  'network': 'var(--blue)',
+  'environment': 'var(--violet)',
+  'assertion': 'var(--cyan)',
+};
+
+const esc = (s) => String(s)
+  .replaceAll('&', '&amp;').replaceAll('<', '&lt;')
+  .replaceAll('>', '&gt;').replaceAll('"', '&quot;');
+
+const day = (iso) => iso.slice(0, 10);
+
+/* Highlight normalization placeholders and the error class in a trace. */
+function renderTrace(trace) {
+  let html = esc(trace);
+  html = html.replace(/&lt;(N|DURATION|TIMESTAMP|UUID|ADDR|HASH)&gt;/g,
+    '<span class="ph">&lt;$1&gt;</span>');
+  html = html.replace(/^(\w*(?:Error|Exception))/,
+    '<span class="errcls">$1</span>');
+  return html;
+}
+
+function render(report, source) {
+  const { summary, signals, clusters, gate } = report;
+  const regressions = signals.filter((s) => s.classification === 'regression');
+  const flaky = [...signals.filter((s) => s.classification === 'flaky')]
+    .sort((a, b) => b.flakinessScore - a.flakinessScore);
+  const attention = signals.filter((s) =>
+    s.classification === 'insufficient-metadata' || s.classification === 'insufficient-data');
+  const totalFailures = clusters.reduce((n, c) => n + c.occurrences, 0);
+  const failing = gate.newRegressions.length > 0;
+
+  document.getElementById('meta').innerHTML =
+    `${summary.testRuns} test runs · ${summary.filesParsed} files · ${summary.testsAnalyzed} tests analyzed · ${esc(day(report.generatedAt))}` +
+    `<span class="src">data: ${esc(source)}</span>`;
+
+  const parts = [];
+
+  /* gate banner */
+  parts.push(`
+    <div class="gate ${failing ? 'fail' : 'pass'}">
+      <span class="verdict">${failing
+        ? `✗ ${gate.newRegressions.length} NEW REGRESSION${gate.newRegressions.length > 1 ? 'S' : ''}`
+        : '✓ ALL CLEAR'}</span>
+      <span class="sub">${failing ? 'CI gate failed — exit code 1' : 'no new regressions — exit code 0'}${
+        gate.baselineUsed ? '' : ' · no baseline (fail-safe mode)'}</span>
+      <span class="counts">
+        <span>new ${gate.newRegressions.length}</span>
+        <span>known ${gate.knownRegressions.length}</span>
+        <span>resolved ${gate.resolvedRegressions.length}</span>
+      </span>
+    </div>`);
+
+  /* headline */
+  if (clusters.length > 0) {
+    parts.push(`
+      <div class="headline">
+        <div class="big"><b class="n-fail">${totalFailures}</b> failures&nbsp; = &nbsp;<b class="n-bugs">${clusters.length}</b> unique bug${clusters.length > 1 ? 's' : ''}</div>
+        <div class="why">failures clustered by normalized stack trace — one cluster, one root cause</div>
+      </div>`);
+  } else {
+    parts.push(`
+      <div class="headline">
+        <div class="big"><b class="n-bugs">0</b> failures in the history window</div>
+        <div class="why">nothing to cluster — the suite is healthy</div>
+      </div>`);
+  }
+
+  /* regressions + flaky grid */
+  parts.push(`
+    <div class="grid">
+      <section class="panel">
+        <h2><span class="dot" style="background:var(--red);box-shadow:0 0 8px var(--red)"></span>Regressions (${regressions.length})</h2>
+        ${regressions.length === 0
+          ? '<div class="empty good">✓ no regressions</div>'
+          : regressions.map((s) => `
+            <div class="card reg">
+              <div class="tid">${esc(s.testId)}</div>
+              <div class="since">broken since ${esc(s.brokenSinceSha ?? '?')}</div>
+              ${s.reason ? `<div class="reason">${esc(s.reason)}</div>` : ''}
+            </div>`).join('')}
+      </section>
+      <section class="panel">
+        <h2><span class="dot" style="background:var(--amber);box-shadow:0 0 8px var(--amber)"></span>Flaky — quarantine candidates (${flaky.length})</h2>
+        ${flaky.length === 0
+          ? '<div class="empty good">✓ no flaky tests</div>'
+          : flaky.map((s) => `
+            <div class="card flk">
+              <div class="tid">${esc(s.testId)} <span class="chip ${esc(s.confidence)}">${esc(s.confidence)}</span></div>
+              <div class="scorebar">
+                <div class="track"><div class="fill" style="width:${Math.round(s.flakinessScore * 100)}%"></div></div>
+                <div class="val">${s.flakinessScore.toFixed(2)}</div>
+              </div>
+              ${s.reason ? `<div class="reason">${esc(s.reason)}</div>` : ''}
+            </div>`).join('')}
+      </section>
+    </div>`);
+
+  /* clusters */
+  const ranked = [...clusters].sort((a, b) =>
+    b.occurrences * b.tests.length - a.occurrences * a.tests.length ||
+    a.representativeTrace.localeCompare(b.representativeTrace));
+  parts.push(`
+    <section class="panel clusters">
+      <h2><span class="dot" style="background:var(--cyan);box-shadow:0 0 8px var(--cyan)"></span>Failure clusters (${clusters.length}) — ranked by impact</h2>
+      ${clusters.length === 0
+        ? '<div class="empty good">✓ no failure clusters — nothing failed with a trace</div>'
+        : ranked.map((c, i) => `
+          <details class="cluster" ${i === 0 ? 'open' : ''}>
+            <summary>
+              <span class="caret">▶</span>
+              <span class="rank">#${i + 1}</span>
+              <span class="head">${esc(headOf(c.representativeTrace))}</span>
+              <span class="occ">${c.occurrences}× · ${c.tests.length} test${c.tests.length > 1 ? 's' : ''}</span>
+              <span class="cid">${esc(c.id)}</span>
+            </summary>
+            <div class="body">
+              ${c.hypothesis ? `
+                <div class="hyp">
+                  <span class="cat" style="color:${CATEGORY_COLORS[c.hypothesis.category] ?? 'var(--cyan)'};border-color:${CATEGORY_COLORS[c.hypothesis.category] ?? 'var(--cyan)'}">${esc(c.hypothesis.category)}</span>
+                  <span class="exp">${esc(c.hypothesis.explanation)}</span>
+                  <span class="ai-tag">— AI hypothesis</span>
+                </div>` : ''}
+              <pre class="trace">${renderTrace(c.representativeTrace)}</pre>
+              <div class="affected">affected: ${c.tests.map((t) => `<code>${esc(t)}</code>`).join(' · ')}
+                &nbsp;·&nbsp; ${esc(day(c.firstSeen))} → ${esc(day(c.lastSeen))}</div>
+            </div>
+          </details>`).join('')}
+    </section>`);
+
+  /* timeline */
+  if (clusters.length > 0) {
+    const min = Math.min(...clusters.map((c) => Date.parse(c.firstSeen)));
+    const max = Math.max(...clusters.map((c) => Date.parse(c.lastSeen)));
+    const span = Math.max(1, max - min);
+    parts.push(`
+      <section class="panel" style="margin-top:18px">
+        <h2><span class="dot" style="background:var(--violet);box-shadow:0 0 8px var(--violet)"></span>Cluster timeline</h2>
+        ${ranked.map((c) => {
+          const left = ((Date.parse(c.firstSeen) - min) / span) * 100;
+          const width = Math.max(3, ((Date.parse(c.lastSeen) - Date.parse(c.firstSeen)) / span) * 100);
+          return `
+            <div class="tl-row">
+              <div class="tl-label" title="${esc(headOf(c.representativeTrace))}">${esc(headOf(c.representativeTrace))}</div>
+              <div class="tl-track"><div class="tl-bar" style="left:${left}%;width:${Math.min(width, 100 - left)}%"></div></div>
+            </div>`;
+        }).join('')}
+        <div class="tl-axis"><span>${esc(day(new Date(min).toISOString()))}</span><span>${esc(day(new Date(max).toISOString()))}</span></div>
+      </section>`);
+  }
+
+  /* needs attention (only when present) */
+  if (attention.length > 0) {
+    parts.push(`
+      <section class="panel" style="margin-top:18px">
+        <h2><span class="dot" style="background:var(--dim)"></span>Needs attention (${attention.length})</h2>
+        ${attention.map((s) => `
+          <div class="card">
+            <div class="tid">${esc(s.testId)} <span class="chip low">${esc(s.classification)}</span></div>
+            ${s.reason ? `<div class="reason">${esc(s.reason)}</div>` : ''}
+          </div>`).join('')}
+      </section>`);
+  }
+
+  /* bottom row: donut + gate detail */
+  parts.push(`
+    <div class="bottom">
+      <section class="panel">
+        <h2><span class="dot" style="background:var(--green);box-shadow:0 0 8px var(--green)"></span>Metadata coverage</h2>
+        <div class="donut-wrap">
+          ${donut(summary.metadataSources)}
+          <div class="legend">
+            <div><i style="background:var(--cyan)"></i> sidecar <b>${summary.metadataSources.sidecar}</b></div>
+            <div><i style="background:var(--violet)"></i> dirname <b>${summary.metadataSources.dirname}</b></div>
+            <div><i style="background:var(--dim)"></i> mtime <b>${summary.metadataSources.mtime}</b></div>
+          </div>
+        </div>
+      </section>
+      <section class="panel gate-detail">
+        <h2><span class="dot" style="background:var(--pink);box-shadow:0 0 8px var(--pink)"></span>CI gate detail</h2>
+        <div class="row"><span class="k new">new</span><span class="v">${gate.newRegressions.map(esc).join(', ') || '—'}</span></div>
+        <div class="row"><span class="k known">known</span><span class="v">${gate.knownRegressions.map(esc).join(', ') || '—'}</span></div>
+        <div class="row"><span class="k res">resolved</span><span class="v">${gate.resolvedRegressions.map(esc).join(', ') || '—'}</span></div>
+        <div class="row"><span class="k" style="color:var(--dim)">baseline</span><span class="v">${gate.baselineUsed ? 'compared against previous report' : 'none — fail-safe: every regression counts as new'}</span></div>
+      </section>
+    </div>`);
+
+  document.getElementById('app').innerHTML = parts.join('');
+}
+
+/* First line / error head of a trace, for compact labels. */
+function headOf(trace) {
+  const head = trace.split(' at ')[0].trim();
+  return head.length > 72 ? head.slice(0, 72) + '…' : head;
+}
+
+/* SVG donut for the three metadata sources. */
+function donut(sources) {
+  const entries = [
+    [sources.sidecar, 'var(--cyan)'],
+    [sources.dirname, 'var(--violet)'],
+    [sources.mtime, 'var(--dim)'],
+  ];
+  const total = entries.reduce((n, [v]) => n + v, 0);
+  if (total === 0) return '<div class="empty">no runs</div>';
+  let offset = 25; /* start at 12 o'clock */
+  const segs = entries.filter(([v]) => v > 0).map(([v, color]) => {
+    const pct = (v / total) * 100;
+    const seg = `<circle r="15.9155" cx="21" cy="21" fill="transparent" stroke="${color}"
+      stroke-width="5" stroke-dasharray="${pct} ${100 - pct}" stroke-dashoffset="${offset}"></circle>`;
+    offset -= pct;
+    return seg;
+  }).join('');
+  return `<svg width="110" height="110" viewBox="0 0 42 42" role="img" aria-label="metadata sources">
+    <circle r="15.9155" cx="21" cy="21" fill="transparent" stroke="#131c30" stroke-width="5"></circle>
+    ${segs}
+    <text x="21" y="22.5" text-anchor="middle" font-size="7" fill="var(--text)" font-family="var(--mono)">${total} runs</text>
+  </svg>`;
+}
+
+/* Prefer a real report next to this file (works via npx serve / GitHub Pages);
+   fall back to the inline sample when fetch is unavailable (file://). */
+fetch('flakehound.report.json')
+  .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+  .then((report) => render(report, 'flakehound.report.json'))
+  .catch(() => render(FALLBACK_REPORT, 'inline sample'));
+</script>
+</body>
+</html>
