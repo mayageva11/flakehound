@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "generatedAt": "2026-07-06T13:25:57.725Z",
+  "summary": {
+    "filesParsed": 4,
+    "testRuns": 12,
+    "metadataSources": {
+      "sidecar": 0,
+      "dirname": 4,
+      "mtime": 0
+    },
+    "testsAnalyzed": 3
+  },
+  "signals": [
+    {
+      "testId": "shop.spec.ts > checkout",
+      "flakinessScore": 1,
+      "classification": "flaky",
+      "confidence": "medium",
+      "reason": "1 pass↔fail transition(s) on the same commit"
+    },
+    {
+      "testId": "shop.spec.ts > login",
+      "flakinessScore": 0,
+      "classification": "stable",
+      "confidence": "high"
+    },
+    {
+      "testId": "shop.spec.ts > payment",
+      "flakinessScore": 0,
+      "classification": "regression",
+      "confidence": "high",
+      "reason": "failing in 100% of the last 3 run(s) since commit bbb2222; passed before it",
+      "brokenSinceSha": "bbb2222"
+    }
+  ],
+  "clusters": [
+    {
+      "id": "7a7c11808d52",
+      "representativeTrace": "AssertionError: expected cart total to equal charged amount at PaymentPage.verify (payment-page.ts:<N>:<N>)",
+      "tests": [
+        "shop.spec.ts > payment"
+      ],
+      "firstSeen": "2026-07-02T10:00:00.000Z",
+      "lastSeen": "2026-07-04T10:00:00.000Z",
+      "occurrences": 3
+    },
+    {
+      "id": "a8a64e2d45ec",
+      "representativeTrace": "TimeoutError: Timeout <DURATION> exceeded waiting for locator('#pay-button') at CheckoutPage.pay (checkout-page.ts:<N>:<N>)",
+      "tests": [
+        "shop.spec.ts > checkout"
+      ],
+      "firstSeen": "2026-07-02T10:00:00.000Z",
+      "lastSeen": "2026-07-04T10:00:00.000Z",
+      "occurrences": 2
+    }
+  ],
+  "gate": {
+    "baselineUsed": false,
+    "newRegressions": [
+      "shop.spec.ts > payment"
+    ],
+    "knownRegressions": [],
+    "resolvedRegressions": []
+  }
+}
