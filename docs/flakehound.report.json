@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-07-06T13:25:57.725Z",
+  "generatedAt": "2026-07-06T23:37:45.509Z",
   "summary": {
     "filesParsed": 4,
     "testRuns": 12,
@@ -43,7 +43,11 @@
       ],
       "firstSeen": "2026-07-02T10:00:00.000Z",
       "lastSeen": "2026-07-04T10:00:00.000Z",
-      "occurrences": 3
+      "occurrences": 3,
+      "hypothesis": {
+        "category": "assertion",
+        "explanation": "The payment-page.ts file contains a bug that causes the cart total to not equal the charged amount in certain scenarios."
+      }
     },
     {
       "id": "a8a64e2d45ec",
@@ -53,7 +57,11 @@
       ],
       "firstSeen": "2026-07-02T10:00:00.000Z",
       "lastSeen": "2026-07-04T10:00:00.000Z",
-      "occurrences": 2
+      "occurrences": 2,
+      "hypothesis": {
+        "category": "timeout",
+        "explanation": "The test is repeatedly waiting for a UI element that is not yet available or is taking too long to render."
+      }
     }
   ],
   "gate": {
