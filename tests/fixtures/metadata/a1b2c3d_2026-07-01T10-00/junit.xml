@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="checkout.spec.ts" tests="2" failures="1" time="5.0">
+    <testcase name="flaky checkout" classname="checkout.spec.ts" time="4.2">
+      <failure message="Timeout 30000ms exceeded">Error: Timeout 30000ms exceeded
+    at /home/ci/repo/e2e/checkout.spec.ts:88:41</failure>
+    </testcase>
+    <testcase name="stable login" classname="checkout.spec.ts" time="0.8"/>
+  </testsuite>
+</testsuites>

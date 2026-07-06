@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="jest tests" tests="3" failures="1" errors="0" time="0.666">
+  <testsuite name="auth/login.test.ts" tests="3" failures="1" errors="0" skipped="0" time="0.666" timestamp="2026-07-01T10:00:00">
+    <testcase classname="LoginForm" name="submits valid credentials" time="0.123"/>
+    <testcase classname="LoginForm" name="rejects wrong password" time="0.087"/>
+    <testcase classname="LoginForm" name="shows session timeout banner" time="0.456">
+      <failure message="expect(received).toBe(expected)">Error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+    at Object.&lt;anonymous&gt; (/home/ci/repo/src/auth/login.test.ts:42:19)
+    at Promise.then.completed (/home/ci/repo/node_modules/jest-circus/build/utils.js:298:28)</failure>
+    </testcase>
+  </testsuite>
+</testsuites>

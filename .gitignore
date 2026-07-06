@@ -1,0 +1,5 @@
+node_modules/
+dist/
+flakehound.report.json
+*.log
+.DS_Store

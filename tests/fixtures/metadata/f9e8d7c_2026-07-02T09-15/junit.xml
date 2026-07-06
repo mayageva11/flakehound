@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="checkout.spec.ts" tests="2" failures="0" time="4.3">
+    <testcase name="flaky checkout" classname="checkout.spec.ts" time="3.5"/>
+    <testcase name="stable login" classname="checkout.spec.ts" time="0.8"/>
+  </testsuite>
+</testsuites>

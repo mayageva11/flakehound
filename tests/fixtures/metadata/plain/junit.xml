@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="smoke.spec.ts" tests="1" failures="0" time="0.5">
+    <testcase name="loads homepage" classname="smoke.spec.ts" time="0.5"/>
+  </testsuite>
+</testsuites>

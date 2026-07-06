@@ -1,0 +1,143 @@
+# flakehound 🐕
+
+![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
+![Node](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)
+![Tests](https://img.shields.io/badge/tests-87%20passing-brightgreen)
+![License](https://img.shields.io/badge/license-MIT-blue)
+
+**Root-cause analysis for flaky tests.** Existing tools count pass/fail and tell you *that* a test is flaky — flakehound clusters failures by their underlying cause and tells you **"23 failures over 3 weeks = 4 unique bugs"**, separates genuinely flaky tests from hard regressions, and gates your CI on *new* regressions only.
+
+```
+flakehound — 12 test runs across 4 files, 3 tests analyzed
+
+Regressions (1)
+  ✗ shop.spec.ts > payment — broken since bbb2222
+      failing in 100% of the last 3 run(s) since commit bbb2222; passed before it
+
+Flaky tests — quarantine candidates (1)
+  ~ shop.spec.ts > checkout — score 1.00 (medium confidence)
+      1 pass↔fail transition(s) on the same commit
+
+Failure clusters (2) — ranked by impact
+  1. [7a7c11808d52] 3 occurrence(s) across 1 test(s)
+      AssertionError: expected cart total to equal charged amount at PaymentPage.verify (payment-page.ts:<N>:<N>)
+  2. [a8a64e2d45ec] 2 occurrence(s) across 1 test(s)
+      TimeoutError: Timeout <DURATION> exceeded waiting for locator('#pay-button') at CheckoutPage.pay (checkout-page.ts:<N>:<N>)
+
+CI gate: 1 new, 0 known, 0 resolved regression(s)
+```
+
+## How it works
+
+1. **Ingest** — parses JUnit XML (the universal CI format: Jest, Playwright, pytest, JUnit) across a history of runs.
+2. **Signal** — scores flakiness by *transition frequency* (pass↔fail flips on the same commit, retry flips within a run), **not** naive fail rate. A test failing 100% since a specific commit is a **regression**, not flaky — the two are mutually exclusive.
+3. **Cluster** — normalizes stack traces (strips line numbers, addresses, durations, path prefixes — keeps error classes, function names, filenames) and groups structurally identical failures. Guiding principle: *prefer false-split over false-merge* — the tool exists to surface bugs, never to hide them.
+4. **Interpret** (optional) — sends each cluster's representative trace to the Claude API for a one-line root-cause hypothesis. The deterministic core works identically without it.
+5. **Report + gate** — terminal report, `flakehound.report.json` artifact, and exit codes usable as a CI gate.
+
+## Usage
+
+```sh
+flakehound analyze --input 'reports/**/*.xml'
+```
+
+| Flag | Meaning |
+|---|---|
+| `-i, --input <glob>` | JUnit XML glob (overrides config) |
+| `-b, --baseline <path>` | previous report — regressions in it are *known* and don't re-fail the gate |
+| `--json <path>` | report artifact path (default `flakehound.report.json`) |
+| `--no-ai` | disable AI interpretation |
+| `-c, --config <path>` | explicit config file |
+
+**Exit codes:** `0` clean · `1` new regression(s) detected · `2` tool error (bad XML, bad config) — so CI can tell "found a bug" from "tool broke".
+
+## Integration contract (run metadata)
+
+Drop your JUnit XML files in a folder — flakehound works with zero metadata. Add more for commit-aware analysis; per XML file, the resolution chain is:
+
+1. **Sidecar** `<name>.meta.json` next to the XML *(best — enables everything)*:
+   ```json
+   { "commitSha": "a1b2c3d", "timestamp": "2026-07-01T10:00:00Z", "runnerId": "ubuntu-22" }
+   ```
+2. **Directory name** convention `{sha}_{timestamp}/`, e.g. `a1b2c3d_2026-07-01T10-00/junit.xml`
+3. **File mtime** — timestamp only; commit-aware signals degrade gracefully (flakiness falls back to time-ordered flips at low confidence; regression detection reports `insufficient-metadata` instead of guessing).
+
+## CI recipe (the gate)
+
+Cache the report artifact between runs and pass it back as the baseline — the gate then fails **once** when a regression lands, not on every run until it's fixed:
+
+```yaml
+- name: Restore previous flakehound report
+  uses: actions/cache/restore@v4
+  with: { path: flakehound.report.json, key: flakehound-report }
+
+- name: flakehound gate
+  run: npx flakehound analyze --input 'test-results/**/*.xml' --baseline flakehound.report.json
+
+- name: Save report for next run
+  if: always()
+  uses: actions/cache/save@v4
+  with: { path: flakehound.report.json, key: flakehound-report-${{ github.run_id }} }
+```
+
+No baseline (first run, cache miss)? flakehound **fails safe**: every regression counts as new.
+
+## Configuration
+
+`flakehound.config.ts` (also `.js` / `.mjs` / `.json`) — TypeScript configs load at runtime via jiti; CLI flags override file values:
+
+```ts
+import { defineConfig } from 'flakehound';
+
+export default defineConfig({
+  input: 'test-results/**/*.xml',
+  historyDays: 21,
+  signal: {
+    flakinessThreshold: 0.2, // score at which a test is called flaky
+    minRuns: 3,              // minimum runs before classifying at all
+    retryFlipWeight: 2,      // intra-run retry flips count double
+  },
+  cluster: {
+    similarityThreshold: 0.7, // Jaccard similarity for co-clustering
+  },
+  ai: {
+    enabled: true,            // also needs ANTHROPIC_API_KEY; --no-ai overrides
+    model: 'claude-sonnet-5',
+  },
+});
+```
+
+## AI layer
+
+With `ai.enabled` and `ANTHROPIC_API_KEY` set, each cluster gets a one-line hypothesis (`race-condition` / `timeout` / `network` / `environment` / `assertion`) via Claude structured outputs. **AI interprets; it is never the source of truth** — it cannot affect scoring, clustering, cluster ids, or exit codes, and any API failure degrades to a report without hypotheses.
+
+## Architecture
+
+```
+src/
+├── ingest/      JUnit XML → canonical TestRun[]; metadata resolution chain
+├── signal/      flakiness scoring (transition frequency) + regression classifier
+├── cluster/     THE CORE: trace normalization → similarity → deterministic clustering
+├── ai/          optional Claude interpretation — thin, at the edge, never source of truth
+├── config/      flakehound.config.ts via jiti, zod-validated, flag overrides
+├── report/      terminal report, JSON artifact, baseline diff (CI gate)
+├── run.ts       pipeline orchestrator (injectable clock/client/streams)
+└── cli.ts       commander entry point
+```
+
+### Design principles
+
+- **Deterministic core, AI only at the edge.** Shuffled input produces byte-identical reports; the AI layer cannot affect scoring, clustering, ids, or exit codes.
+- **Prefer false-split over false-merge.** A merged pair of distinct bugs hides a defect; a split bug is a duplicate resolved by eye. Every normalization rule must be justifiable as *unambiguously volatile* — which is why line numbers are stripped but HTTP status codes are preserved.
+- **Flakiness ≠ fail rate.** A test failing 100% of the time isn't flaky — it's broken. Scoring counts pass↔fail *transitions* on the same commit (and retry flips within a run), and the regression classifier runs first, mutually exclusive.
+- **Graceful degradation as a contract.** Missing metadata is a first-class case: signals downgrade confidence and say why, instead of guessing or crashing.
+- **A QA tool practices what it preaches.** Every non-trivial module is unit-tested (87 tests), including shuffled-input determinism and exact threshold boundaries.
+
+## Development
+
+```sh
+npm install
+npm test           # vitest — the full suite
+npm run typecheck  # strict TS
+npm run build      # emit dist/
+```

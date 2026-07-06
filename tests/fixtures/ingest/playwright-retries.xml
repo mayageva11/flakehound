@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites id="" name="" tests="2" failures="1" skipped="0" errors="0" time="7.3">
+  <testsuite name="checkout.spec.ts" timestamp="2026-07-01T14:30:00" hostname="chromium" tests="2" failures="1" skipped="0" time="7.3" errors="0">
+    <testcase name="completes payment" classname="checkout.spec.ts" time="4.1">
+      <failure message="Timeout 30000ms exceeded while waiting for locator('#pay-button')" type="FAILURE">Error: Timeout 30000ms exceeded while waiting for locator('#pay-button')
+    at /home/ci/repo/e2e/checkout.spec.ts:88:41
+    at ProgressController.run (/home/ci/repo/node_modules/playwright-core/lib/server/progress.js:75:24)</failure>
+    </testcase>
+    <testcase name="completes payment" classname="checkout.spec.ts" time="3.2"/>
+  </testsuite>
+</testsuites>

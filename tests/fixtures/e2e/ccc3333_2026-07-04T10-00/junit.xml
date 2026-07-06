@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="shop.spec.ts" tests="3" failures="2" time="38.5">
+    <testcase name="checkout" classname="shop.spec.ts" time="30.0">
+      <failure message="Timeout 30000ms exceeded waiting for locator('#pay-button')">TimeoutError: Timeout 30000ms exceeded waiting for locator('#pay-button')
+    at CheckoutPage.pay (/home/ci/repo/e2e/pages/checkout-page.ts:91:41)</failure>
+    </testcase>
+    <testcase name="payment" classname="shop.spec.ts" time="7.8">
+      <failure message="AssertionError: expected cart total to equal charged amount">AssertionError: expected cart total to equal charged amount
+    at PaymentPage.verify (/home/ci/repo/e2e/pages/payment-page.ts:54:11)</failure>
+    </testcase>
+    <testcase name="login" classname="shop.spec.ts" time="0.7"/>
+  </testsuite>
+</testsuites>

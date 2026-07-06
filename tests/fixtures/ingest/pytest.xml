@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<testsuite name="pytest" tests="3" errors="1" failures="0" skipped="1" time="0.312" timestamp="2026-07-02T09:15:00" hostname="ci-runner-3">
+  <testcase classname="tests.test_api" name="test_get_user" time="0.051"/>
+  <testcase classname="tests.test_api" name="test_slow_endpoint" time="0.000">
+    <skipped type="pytest.skip" message="requires staging environment"/>
+  </testcase>
+  <testcase classname="tests.test_api" name="test_db_connection" time="0.261">
+    <error message="ConnectionError: could not connect to postgres:5432" type="ConnectionError">Traceback (most recent call last):
+  File "/home/ci/repo/tests/test_api.py", line 77, in test_db_connection
+    conn = psycopg2.connect(DSN, connect_timeout=3)
+ConnectionError: could not connect to postgres:5432</error>
+  </testcase>
+</testsuite>

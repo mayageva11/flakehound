@@ -1,0 +1,4 @@
+{
+  "input": "json-runs/**/*.xml",
+  "ai": { "enabled": false }
+}

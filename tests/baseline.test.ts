@@ -1,0 +1,79 @@
+import { describe, expect, it } from 'vitest';
+import { diffAgainstBaseline } from '../src/report/baseline.js';
+import type { FlakehoundReport } from '../src/report/types.js';
+import type { TestSignal } from '../src/signal/types.js';
+
+function regression(testId: string): TestSignal {
+  return {
+    testId,
+    flakinessScore: 0,
+    classification: 'regression',
+    confidence: 'high',
+    brokenSinceSha: 'bbb2222',
+  };
+}
+
+function stable(testId: string): TestSignal {
+  return { testId, flakinessScore: 0, classification: 'stable', confidence: 'high' };
+}
+
+function baselineWith(...signals: TestSignal[]): FlakehoundReport {
+  return {
+    version: 1,
+    generatedAt: '2026-07-01T00:00:00.000Z',
+    summary: {
+      filesParsed: 1,
+      testRuns: 1,
+      testsAnalyzed: signals.length,
+      metadataSources: { sidecar: 0, dirname: 1, mtime: 0 },
+    },
+    signals,
+    clusters: [],
+    gate: { baselineUsed: false, newRegressions: [], knownRegressions: [], resolvedRegressions: [] },
+  };
+}
+
+describe('diffAgainstBaseline', () => {
+  it('regression in both → known (does not re-fail the gate)', () => {
+    const gate = diffAgainstBaseline([regression('t1')], baselineWith(regression('t1')));
+    expect(gate).toEqual({
+      baselineUsed: true,
+      newRegressions: [],
+      knownRegressions: ['t1'],
+      resolvedRegressions: [],
+    });
+  });
+
+  it('regression only in current → new', () => {
+    const gate = diffAgainstBaseline(
+      [regression('t1'), regression('t2')],
+      baselineWith(regression('t1')),
+    );
+    expect(gate.newRegressions).toEqual(['t2']);
+    expect(gate.knownRegressions).toEqual(['t1']);
+  });
+
+  it('regression only in baseline → resolved (surfaced as good news)', () => {
+    const gate = diffAgainstBaseline([stable('t1')], baselineWith(regression('t1')));
+    expect(gate.newRegressions).toEqual([]);
+    expect(gate.resolvedRegressions).toEqual(['t1']);
+  });
+
+  it('no baseline → fail-safe: every regression is new', () => {
+    const gate = diffAgainstBaseline([regression('t2'), regression('t1')], undefined);
+    expect(gate.baselineUsed).toBe(false);
+    expect(gate.newRegressions).toEqual(['t1', 't2']); // sorted, deterministic
+    expect(gate.knownRegressions).toEqual([]);
+  });
+
+  it('non-regression classifications never enter the gate', () => {
+    const flaky: TestSignal = {
+      testId: 'f1',
+      flakinessScore: 0.8,
+      classification: 'flaky',
+      confidence: 'high',
+    };
+    const gate = diffAgainstBaseline([flaky, stable('s1')], undefined);
+    expect(gate.newRegressions).toEqual([]);
+  });
+});
