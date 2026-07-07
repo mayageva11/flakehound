@@ -10,11 +10,12 @@ function regression(testId: string): TestSignal {
     classification: 'regression',
     confidence: 'high',
     brokenSinceSha: 'bbb2222',
+    history: [],
   };
 }
 
 function stable(testId: string): TestSignal {
-  return { testId, flakinessScore: 0, classification: 'stable', confidence: 'high' };
+  return { testId, flakinessScore: 0, classification: 'stable', confidence: 'high', history: [] };
 }
 
 function baselineWith(...signals: TestSignal[]): FlakehoundReport {
@@ -72,6 +73,7 @@ describe('diffAgainstBaseline', () => {
       flakinessScore: 0.8,
       classification: 'flaky',
       confidence: 'high',
+      history: [],
     };
     const gate = diffAgainstBaseline([flaky, stable('s1')], undefined);
     expect(gate.newRegressions).toEqual([]);

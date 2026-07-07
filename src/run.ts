@@ -75,7 +75,7 @@ export async function runAnalyze(options: RunAnalyzeOptions = {}): Promise<RunAn
   return { report, reportPath, exitCode: gate.newRegressions.length > 0 ? 1 : 0 };
 }
 
-function applyHistoryWindow(
+export function applyHistoryWindow(
   runs: TestRun[],
   historyDays: number | undefined,
   now: () => Date,

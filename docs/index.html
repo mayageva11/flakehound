@@ -413,6 +413,18 @@
     border-left: 2px solid var(--border);
   }
 
+  /* ── per-run history timeline (signals[].history) ────── */
+  .run-history { display: flex; align-items: center; gap: 4px; margin-top: 10px; flex-wrap: wrap; }
+  .run-history .rh-label { font-family: var(--mono); font-size: 10px; color: var(--text-muted); letter-spacing: 0.5px; text-transform: uppercase; margin-right: 2px; }
+  .run-history .rh-cell {
+    width: 14px; height: 14px; border-radius: 4px; display: inline-block; position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+  }
+  .run-history .rh-cell.pass { background: var(--success); box-shadow: 0 0 6px rgba(16, 185, 129, 0.4); }
+  .run-history .rh-cell.fail { background: var(--danger); box-shadow: 0 0 6px rgba(244, 63, 94, 0.4); }
+  .run-history .rh-cell.skip { background: rgba(148, 163, 184, 0.25); }
+  .run-history .rh-cell.flip { outline: 2px solid var(--warning); outline-offset: 1px; }
+
   .chip {
     font-family: var(--mono);
     font-size: 10px;
@@ -1089,6 +1101,19 @@ const esc = (s) => String(s)
 
 const day = (iso) => iso.slice(0, 10);
 
+/* Per-run pass/fail timeline from signals[].history: green pass, red fail,
+   amber outline = intra-run retry flip. Empty when the report predates history. */
+function runHistory(signal) {
+  const history = signal.history ?? [];
+  if (history.length === 0) return '';
+  const cells = history.map((h) => {
+    const flip = h.retryFlips > 0 ? ' flip' : '';
+    const title = `${day(h.timestamp)} · ${h.commitSha ? h.commitSha.slice(0, 7) : 'no sha'} · ${h.verdict}${h.retryFlips > 0 ? ' (retry flip)' : ''}`;
+    return `<span class="rh-cell ${h.verdict}${flip}" title="${esc(title)}"></span>`;
+  });
+  return `<div class="run-history"><span class="rh-label">runs</span>${cells.join('')}</div>`;
+}
+
 function renderTrace(trace) {
   let html = esc(trace);
   html = html.replace(/&lt;(N|DURATION|TIMESTAMP|UUID|ADDR|HASH)&gt;/g,
@@ -1253,6 +1278,7 @@ function render(report, source) {
                 </div>
                 <div class="card-subtitle reg">broken since SHA: ${esc(s.brokenSinceSha ?? '?')}</div>
                 ${s.reason ? `<div class="card-reason">${esc(s.reason)}</div>` : ''}
+                ${runHistory(s)}
               </div>`).join('')}
         </div>
         <div id="regressions-empty" class="empty-state hidden">No matching regressions found</div>
@@ -1280,6 +1306,7 @@ function render(report, source) {
                   <div class="score-bar-val">${s.flakinessScore.toFixed(2)}</div>
                 </div>
                 ${s.reason ? `<div class="card-reason">${esc(s.reason)}</div>` : ''}
+                ${runHistory(s)}
               </div>`).join('')}
         </div>
         <div id="flaky-empty" class="empty-state hidden">No matching flaky tests found</div>

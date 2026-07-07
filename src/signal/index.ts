@@ -12,7 +12,7 @@ export type { CrossRunBasis, FlakinessResult } from './flakiness.js';
 export { classifyRegression } from './regression.js';
 export type { RegressionResult } from './regression.js';
 export { DEFAULT_SIGNAL_CONFIG } from './types.js';
-export type { Classification, Confidence, SignalConfig, TestSignal } from './types.js';
+export type { Classification, Confidence, HistoryEntry, SignalConfig, TestSignal } from './types.js';
 
 /**
  * Compute per-test signals from the full run history.
@@ -45,6 +45,14 @@ function analyzeTest(testId: string, runs: TestRun[], config: SignalConfig): Tes
   const executions = groupExecutions(runs);
   const scorable = executions.filter((e) => e.verdict !== 'skip');
   const flakiness = scoreFlakiness(executions, config);
+  // The evidence behind the classification, published so reports can SHOW the
+  // flips. Executions are already chronologically sorted by groupExecutions.
+  const history = executions.map((e) => ({
+    timestamp: e.timestamp,
+    ...(e.commitSha !== undefined ? { commitSha: e.commitSha } : {}),
+    verdict: e.verdict,
+    retryFlips: e.retryFlips,
+  }));
 
   if (scorable.length < config.minRuns) {
     return {
@@ -53,6 +61,7 @@ function analyzeTest(testId: string, runs: TestRun[], config: SignalConfig): Tes
       classification: 'insufficient-data',
       confidence: 'low',
       reason: `only ${scorable.length} scorable run(s) in the history window; ${config.minRuns} required to classify`,
+      history,
     };
   }
 
@@ -65,6 +74,7 @@ function analyzeTest(testId: string, runs: TestRun[], config: SignalConfig): Tes
       confidence: 'high',
       reason: `failing in 100% of the last ${regression.failingStreak} run(s) since commit ${regression.brokenSinceSha}; passed before it`,
       brokenSinceSha: regression.brokenSinceSha,
+      history,
     };
   }
   if (regression.kind === 'needs-metadata') {
@@ -74,6 +84,7 @@ function analyzeTest(testId: string, runs: TestRun[], config: SignalConfig): Tes
       classification: 'insufficient-metadata',
       confidence: 'low',
       reason: `failing in the last ${regression.failingStreak} consecutive run(s) after passing, but commitSha is unavailable — cannot pin the breaking commit; add sidecar metadata to enable regression detection`,
+      history,
     };
   }
 
@@ -98,6 +109,7 @@ function analyzeTest(testId: string, runs: TestRun[], config: SignalConfig): Tes
       classification: 'flaky',
       confidence,
       reason: signals.join('; '),
+      history,
     };
   }
 
@@ -113,5 +125,6 @@ function analyzeTest(testId: string, runs: TestRun[], config: SignalConfig): Tes
             'failing in 100% of observed runs with no passing run in the history window — cannot determine a breaking commit; widen the window or check the test',
         }
       : {}),
+    history,
   };
 }
