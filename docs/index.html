@@ -413,6 +413,12 @@
     border-left: 2px solid var(--border);
   }
 
+  .cluster-new-badge {
+    font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: 1px;
+    color: var(--danger); border: 1px solid rgba(244, 63, 94, 0.5); border-radius: 6px;
+    padding: 2px 7px; background: var(--danger-bg); box-shadow: 0 0 8px rgba(244, 63, 94, 0.25);
+  }
+
   /* ── per-run history timeline (signals[].history) ────── */
   .run-history { display: flex; align-items: center; gap: 4px; margin-top: 10px; flex-wrap: wrap; }
   .run-history .rh-label { font-family: var(--mono); font-size: 10px; color: var(--text-muted); letter-spacing: 0.5px; text-transform: uppercase; margin-right: 2px; }
@@ -1377,6 +1383,7 @@ function render(report, source) {
                   </div>
                   <span class="cluster-rank">#${i + 1}</span>
                   <span class="cluster-head" title="${esc(c.representativeTrace)}">${esc(headOf(c.representativeTrace))}</span>
+                  ${gate.baselineUsed && (gate.newClusters ?? []).includes(c.id) ? '<span class="cluster-new-badge">NEW</span>' : ''}
                   <span class="cluster-badge">${c.occurrences}× over ${c.tests.length} test${c.tests.length > 1 ? 's' : ''}</span>
                   <span class="cluster-id-badge">${esc(c.id)}</span>
                 </summary>

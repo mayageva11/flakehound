@@ -33,9 +33,9 @@ CI gate: 1 new, 0 known, 0 resolved regression(s)
 
 1. **Ingest** — parses JUnit XML (the universal CI format: Jest, Playwright, pytest, JUnit) across a history of runs.
 2. **Signal** — scores flakiness by *transition frequency* (pass↔fail flips on the same commit, retry flips within a run), **not** naive fail rate. A test failing 100% since a specific commit is a **regression**, not flaky — the two are mutually exclusive.
-3. **Cluster** — normalizes stack traces (strips line numbers, addresses, durations, path prefixes — keeps error classes, function names, filenames) and groups structurally identical failures. Guiding principle: *prefer false-split over false-merge* — the tool exists to surface bugs, never to hide them.
+3. **Cluster** — normalizes stack traces (strips line numbers, addresses, durations, path prefixes — keeps error classes, function names, filenames) and groups structurally identical failures. Similarity is **head-weighted**: error-class/message tokens weigh double, so the bug's identity dominates shared library frames. Guiding principle: *prefer false-split over false-merge* — the tool exists to surface bugs, never to hide them.
 4. **Interpret** (optional) — sends each cluster's representative trace to the Claude API for a one-line root-cause hypothesis. The deterministic core works identically without it.
-5. **Report + gate** — terminal report, `flakehound.report.json` artifact, and exit codes usable as a CI gate.
+5. **Report + gate** — terminal report, `flakehound.report.json` artifact, and exit codes usable as a CI gate. With a baseline, clusters are also diffed — a **NEW** cluster means a bug shape never seen before (informational; only new *regressions* fail the gate). `flakehound explain <testId>` prints any test's run-by-run story.
 
 ## Usage
 
@@ -131,7 +131,8 @@ export default defineConfig({
     retryFlipWeight: 2,      // intra-run retry flips count double
   },
   cluster: {
-    similarityThreshold: 0.7, // Jaccard similarity for co-clustering
+    similarityThreshold: 0.7, // similarity for co-clustering
+    weighting: 'head',        // error head weighs double; 'uniform' = plain Jaccard
   },
   ai: {
     enabled: true,            // --no-ai overrides

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { normalizeTrace } from './normalize.js';
 import type { NormalizedTrace } from './normalize.js';
-import { JaccardSimilarity } from './similarity.js';
+import { JaccardSimilarity, WeightedJaccardSimilarity } from './similarity.js';
 import type { SimilarityMetric } from './similarity.js';
 
 export interface FailureOccurrence {
@@ -27,11 +27,19 @@ export interface FailureCluster {
 export interface ClusterConfig {
   /** Fixed, defensible threshold — deliberately not adaptive. */
   similarityThreshold: number;
+  /**
+   * 'head' (default): error-class/message tokens weigh double, so the bug's
+   * identity dominates shared library frames (resists false merges).
+   * 'uniform': the original all-tokens-equal Jaccard via `metric`.
+   */
+  weighting: 'head' | 'uniform';
+  /** The metric used when weighting is 'uniform' (custom metrics plug in here). */
   metric: SimilarityMetric;
 }
 
 export const DEFAULT_CLUSTER_CONFIG: ClusterConfig = {
   similarityThreshold: 0.7,
+  weighting: 'head',
   metric: new JaccardSimilarity(),
 };
 
@@ -77,20 +85,22 @@ export function clusterFailures(
     else group.push(entry);
   }
 
+  const weighted = new WeightedJaccardSimilarity();
+  const similarity = (a: NormalizedTrace, b: NormalizedTrace): number =>
+    config.weighting === 'head' ? weighted.compare(a, b) : config.metric.compare(a.tokens, b.tokens);
+
   interface ProtoCluster {
     representative: NormalizedTrace;
     members: typeof entries;
   }
   const clusters: ProtoCluster[] = [];
   for (const group of byCanonical.values()) {
-    const tokens = group[0]!.normalized.tokens;
+    const normalized = group[0]!.normalized;
     const home = clusters.find(
-      (cluster) =>
-        config.metric.compare(cluster.representative.tokens, tokens) >=
-        config.similarityThreshold,
+      (cluster) => similarity(cluster.representative, normalized) >= config.similarityThreshold,
     );
     if (home !== undefined) home.members.push(...group);
-    else clusters.push({ representative: group[0]!.normalized, members: [...group] });
+    else clusters.push({ representative: normalized, members: [...group] });
   }
 
   return clusters.map((cluster) => toFailureCluster(cluster.representative, cluster.members));

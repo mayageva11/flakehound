@@ -46,6 +46,7 @@ export async function runAnalyze(options: RunAnalyzeOptions = {}): Promise<RunAn
   const signals = computeSignals(windowed, config.signal);
   const clusters = clusterTestRuns(windowed, {
     similarityThreshold: config.cluster.similarityThreshold,
+    weighting: config.cluster.weighting,
   });
   const interpreted = await interpretClusters(clusters, {
     config: config.ai,
@@ -58,7 +59,9 @@ export async function runAnalyze(options: RunAnalyzeOptions = {}): Promise<RunAn
     config.baseline === undefined
       ? undefined
       : await loadBaseline(path.resolve(cwd, config.baseline), warn);
-  const gate = diffAgainstBaseline(signals, baseline);
+  const gate = diffAgainstBaseline(signals, baseline, clusters, {
+    similarityThreshold: config.cluster.similarityThreshold,
+  });
 
   const report = buildReport({
     generatedAt: now().toISOString(),

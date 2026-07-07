@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-07-07T10:18:22.554Z",
+  "generatedAt": "2026-07-07T12:22:04.623Z",
   "summary": {
     "filesParsed": 4,
     "testRuns": 12,
@@ -124,7 +124,7 @@
       "occurrences": 3,
       "hypothesis": {
         "category": "assertion",
-        "explanation": "The failure is likely due to an incorrect or inconsistent calculation in the PaymentPage.verify method."
+        "explanation": "The test is verifying a specific assertion about the cart total, suggesting that the failure might be due to an incorrect implementation or data issue."
       }
     },
     {
@@ -137,8 +137,8 @@
       "lastSeen": "2026-07-04T10:00:00.000Z",
       "occurrences": 2,
       "hypothesis": {
-        "category": "timeout",
-        "explanation": "The test is waiting too long for an element to become available on the page, likely due to a slow or unresponsive web application."
+        "category": "race-condition",
+        "explanation": "Multiple test runs happened concurrently, causing the 'pay-button' locator to be locked by another test while waiting for it to be available."
       }
     }
   ],
@@ -148,6 +148,11 @@
       "shop.spec.ts > payment"
     ],
     "knownRegressions": [],
-    "resolvedRegressions": []
+    "resolvedRegressions": [],
+    "newClusters": [
+      "7a7c11808d52",
+      "a8a64e2d45ec"
+    ],
+    "knownClusters": []
   }
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { diffAgainstBaseline } from '../src/report/baseline.js';
+import { diffAgainstBaseline, diffClusters } from '../src/report/baseline.js';
+import type { FailureCluster } from '../src/cluster/index.js';
 import type { FlakehoundReport } from '../src/report/types.js';
 import type { TestSignal } from '../src/signal/types.js';
 
@@ -30,7 +31,14 @@ function baselineWith(...signals: TestSignal[]): FlakehoundReport {
     },
     signals,
     clusters: [],
-    gate: { baselineUsed: false, newRegressions: [], knownRegressions: [], resolvedRegressions: [] },
+    gate: {
+      baselineUsed: false,
+      newRegressions: [],
+      knownRegressions: [],
+      resolvedRegressions: [],
+      newClusters: [],
+      knownClusters: [],
+    },
   };
 }
 
@@ -42,6 +50,8 @@ describe('diffAgainstBaseline', () => {
       newRegressions: [],
       knownRegressions: ['t1'],
       resolvedRegressions: [],
+      newClusters: [],
+      knownClusters: [],
     });
   });
 
@@ -77,5 +87,58 @@ describe('diffAgainstBaseline', () => {
     };
     const gate = diffAgainstBaseline([flaky, stable('s1')], undefined);
     expect(gate.newRegressions).toEqual([]);
+  });
+});
+
+function cluster(id: string, representativeTrace: string): FailureCluster {
+  return {
+    id,
+    representativeTrace,
+    tests: ['t'],
+    firstSeen: '2026-07-01T10:00:00.000Z',
+    lastSeen: '2026-07-02T10:00:00.000Z',
+    occurrences: 2,
+  };
+}
+
+function baselineWithClusters(...clusters: FailureCluster[]): FlakehoundReport {
+  return { ...baselineWith(stable('s1')), clusters };
+}
+
+describe('diffClusters — "a new unique bug appeared" (informational)', () => {
+  const timeoutRep =
+    "TimeoutError: Timeout <DURATION> exceeded waiting for locator('#pay-button') at CheckoutPage.pay (checkout-page.ts:<N>:<N>)";
+  const assertRep =
+    'AssertionError: expected cart total to equal charged amount at PaymentPage.verify (payment-page.ts:<N>:<N>)';
+
+  it('no baseline → every cluster is new (fail-safe-consistent)', () => {
+    const diff = diffClusters([cluster('bbb', timeoutRep), cluster('aaa', assertRep)], undefined);
+    expect(diff).toEqual({ newClusters: ['aaa', 'bbb'], knownClusters: [] });
+  });
+
+  it('id present in the baseline → known', () => {
+    const diff = diffClusters(
+      [cluster('aaa', timeoutRep)],
+      baselineWithClusters(cluster('aaa', timeoutRep)),
+    );
+    expect(diff).toEqual({ newClusters: [], knownClusters: ['aaa'] });
+  });
+
+  it('drifted representative (different id, similar trace) still matches → known', () => {
+    // same bug, but the representative gained a trailing frame → new hash id
+    const drifted = `${timeoutRep} at shop.spec.ts:<N>:<N>`;
+    const diff = diffClusters(
+      [cluster('new-id', drifted)],
+      baselineWithClusters(cluster('old-id', timeoutRep)),
+    );
+    expect(diff).toEqual({ newClusters: [], knownClusters: ['new-id'] });
+  });
+
+  it('genuinely different failure → new, alongside known ones', () => {
+    const diff = diffClusters(
+      [cluster('t1', timeoutRep), cluster('a1', assertRep)],
+      baselineWithClusters(cluster('t1', timeoutRep)),
+    );
+    expect(diff).toEqual({ newClusters: ['a1'], knownClusters: ['t1'] });
   });
 });

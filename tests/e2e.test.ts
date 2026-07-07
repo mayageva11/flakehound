@@ -94,6 +94,15 @@ describe('flakehound end-to-end', () => {
     expect(second.report.gate.newRegressions).toEqual([]);
     expect(second.report.gate.knownRegressions).toEqual(['shop.spec.ts > payment']);
     expect(second.exitCode).toBe(0); // known regression does not re-fail the gate
+
+    // cluster novelty: both clusters existed in the baseline → known, none new
+    expect(second.report.gate.newClusters).toEqual([]);
+    expect(second.report.gate.knownClusters.sort()).toEqual(
+      second.report.clusters.map((c) => c.id).sort(),
+    );
+    expect(second.terminal).toContain('0 new since baseline');
+    // first run had no baseline → every cluster reported new (fail-safe-consistent)
+    expect(first.report.gate.newClusters).toHaveLength(2);
   });
 
   it('unreadable baseline → fail-safe (all regressions new), run does not crash', async () => {
