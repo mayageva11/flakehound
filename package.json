@@ -1,6 +1,6 @@
 {
   "name": "flakehound",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Root-cause analysis for flaky tests — clusters failures by underlying cause and separates flaky tests from hard regressions.",
   "type": "module",
   "license": "MIT",
@@ -13,7 +13,7 @@
     "url": "https://github.com/mayageva11/flakehound/issues"
   },
   "bin": {
-    "flakehound": "./dist/cli.js"
+    "flakehound": "dist/cli.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
