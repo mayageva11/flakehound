@@ -1,5 +1,6 @@
 # flakehound 🐕
 
+[![npm](https://img.shields.io/npm/v/flakehound?logo=npm&color=CB3837)](https://www.npmjs.com/package/flakehound)
 [![ci](https://github.com/mayageva11/flakehound/actions/workflows/ci.yml/badge.svg)](https://github.com/mayageva11/flakehound/actions/workflows/ci.yml)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 ![Node](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)
@@ -237,8 +238,24 @@ npm run build      # emit dist/
 
 ## Releasing
 
-CI (typecheck + tests + build on Node 20/22, plus an action self-test) runs on
-every push and PR. Publishing to npm is tag-driven: `npm version <x.y.z> &&
-git push --follow-tags` triggers the release workflow, which publishes with
-provenance. One-time setup: add an npm automation token as the `NPM_TOKEN`
-repository secret.
+Releases are tag-driven and fully automated:
+
+```sh
+npm version <x.y.z>      # bumps package.json and creates the vX.Y.Z tag
+git push --follow-tags   # the release workflow takes it from there
+```
+
+The workflow re-runs typecheck + tests + build on the tagged commit, then
+publishes to npm **with provenance** — the published package is
+cryptographically attested to the exact commit and CI run that built it. A
+failure at any step aborts before anything is published.
+
+CI itself (typecheck, tests, build on Node 20 and 22, plus the action
+self-test) runs independently on every push and pull request.
+
+**Maintainer note:** publishing authenticates with the `NPM_TOKEN` repository
+secret. npm requires two-factor auth for publishes, and a CI runner can't type
+an OTP — so the token must be one that is allowed to bypass 2FA: a classic
+**Automation** token, or a granular access token with *"Bypass two-factor
+authentication"* enabled (and write access to the package). A plain publish
+token will fail with `E403`.
