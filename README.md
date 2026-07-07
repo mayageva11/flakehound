@@ -3,7 +3,7 @@
 [![ci](https://github.com/mayageva11/flakehound/actions/workflows/ci.yml/badge.svg)](https://github.com/mayageva11/flakehound/actions/workflows/ci.yml)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 ![Node](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-123%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-133%20passing-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
 **Live dashboard:** [mayageva11.github.io/flakehound](https://mayageva11.github.io/flakehound/) — rendered from a real `flakehound.report.json`.
@@ -35,7 +35,7 @@ CI gate: 1 new, 0 known, 0 resolved regression(s)
 1. **Ingest** — parses JUnit XML (the universal CI format: Jest, Playwright, pytest, JUnit) across a history of runs.
 2. **Signal** — scores flakiness by *transition frequency* (pass↔fail flips on the same commit, retry flips within a run), **not** naive fail rate. A test failing 100% since a specific commit is a **regression**, not flaky — the two are mutually exclusive.
 3. **Cluster** — normalizes stack traces (strips line numbers, addresses, durations, path prefixes — keeps error classes, function names, filenames) and groups structurally identical failures. Similarity is **head-weighted**: error-class/message tokens weigh double, so the bug's identity dominates shared library frames. Guiding principle: *prefer false-split over false-merge* — the tool exists to surface bugs, never to hide them.
-4. **Interpret** (optional) — sends each cluster's representative trace to the Claude API for a one-line root-cause hypothesis. The deterministic core works identically without it.
+4. **Interpret** (optional) — sends each cluster's representative trace to a pluggable inference provider — a local Ollama model when one is reachable (zero cost, nothing leaves your machine), else the Claude API when `ANTHROPIC_API_KEY` is set — for a one-line root-cause hypothesis. The deterministic core works identically without either.
 5. **Report + gate** — terminal report, `flakehound.report.json` artifact, and exit codes usable as a CI gate. With a baseline, clusters are also diffed — a **NEW** cluster means a bug shape never seen before (informational; only new *regressions* fail the gate). `flakehound explain <testId>` prints any test's run-by-run story.
 
 ## Quick start
@@ -224,7 +224,7 @@ src/
 - **Prefer false-split over false-merge.** A merged pair of distinct bugs hides a defect; a split bug is a duplicate resolved by eye. Every normalization rule must be justifiable as *unambiguously volatile* — which is why line numbers are stripped but HTTP status codes are preserved.
 - **Flakiness ≠ fail rate.** A test failing 100% of the time isn't flaky — it's broken. Scoring counts pass↔fail *transitions* on the same commit (and retry flips within a run), and the regression classifier runs first, mutually exclusive.
 - **Graceful degradation as a contract.** Missing metadata is a first-class case: signals downgrade confidence and say why, instead of guessing or crashing.
-- **A QA tool practices what it preaches.** Every non-trivial module is unit-tested (87 tests), including shuffled-input determinism and exact threshold boundaries.
+- **A QA tool practices what it preaches.** Every non-trivial module is unit-tested (133 tests), including shuffled-input determinism and exact threshold boundaries.
 
 ## Development
 
