@@ -38,11 +38,34 @@ CI gate: 1 new, 0 known, 0 resolved regression(s)
 4. **Interpret** (optional) — sends each cluster's representative trace to the Claude API for a one-line root-cause hypothesis. The deterministic core works identically without it.
 5. **Report + gate** — terminal report, `flakehound.report.json` artifact, and exit codes usable as a CI gate. With a baseline, clusters are also diffed — a **NEW** cluster means a bug shape never seen before (informational; only new *regressions* fail the gate). `flakehound explain <testId>` prints any test's run-by-run story.
 
-## Usage
+## Quick start
 
 ```sh
-flakehound analyze --input 'reports/**/*.xml'
+# 1. Install (or run everything through npx, no install needed)
+npm install --save-dev flakehound
+
+# 2. Point your test runner at JUnit XML output — Jest, Playwright,
+#    pytest, JUnit, Surefire… every major runner emits it.
+
+# 3. Scaffold a commented config (optional — sensible defaults otherwise)
+npx flakehound init
+
+# 4. Analyze your run history
+npx flakehound analyze
 ```
+
+That's the whole integration: JUnit XML in, root-cause analysis out. No plugins,
+no per-runner adapters, no account.
+
+## Commands
+
+| Command | What it does |
+|---|---|
+| `flakehound analyze` | Analyze the JUnit XML history: score flakiness, isolate regressions, cluster failures, gate CI |
+| `flakehound explain <testId>` | One test's run-by-run story: history table, classification reasoning, its clusters |
+| `flakehound init` | Scaffold a fully commented `flakehound.config.ts` (never overwrites; `--force` to replace) |
+
+### `analyze` flags
 
 | Flag | Meaning |
 |---|---|
@@ -52,7 +75,7 @@ flakehound analyze --input 'reports/**/*.xml'
 | `--no-ai` | disable AI interpretation |
 | `-c, --config <path>` | explicit config file |
 
-**Exit codes:** `0` clean · `1` new regression(s) detected · `2` tool error (bad XML, bad config) — so CI can tell "found a bug" from "tool broke".
+**Exit codes:** `0` clean · `1` new regression(s) detected · `2` tool error (bad XML, bad config, or an input glob that matched **zero** files — a QA gate never silently passes on no evidence) — so CI can tell "found a bug" from "tool broke".
 
 ## Integration contract (run metadata)
 
@@ -135,7 +158,7 @@ No baseline anywhere (first run, cache miss, missing artifact)? flakehound **fai
 
 ## Configuration
 
-`flakehound.config.ts` (also `.js` / `.mjs` / `.json`) — TypeScript configs load at runtime via jiti; CLI flags override file values:
+`flakehound.config.ts` (also `.js` / `.mjs` / `.json`) — TypeScript configs load at runtime via jiti; CLI flags override file values. `npx flakehound init` scaffolds a fully commented version of this file:
 
 ```ts
 import { defineConfig } from 'flakehound';

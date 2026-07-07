@@ -1,8 +1,21 @@
-export const VERSION = '0.1.0';
+import { readFileSync } from 'node:fs';
+
+/**
+ * Read at runtime from package.json so --version can never drift from the
+ * published version. Resolves from both src/ (tests) and dist/ (production):
+ * either way, ../package.json is the package root.
+ */
+export const VERSION: string = (
+  JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {
+    version: string;
+  }
+).version;
 
 export { defineConfig } from './config/define-config.js';
-export { loadConfig } from './config/load.js';
+export { CONFIG_FILES, findConfigFile, loadConfig } from './config/load.js';
 export type { CliOverrides } from './config/load.js';
+export { runInit } from './init.js';
+export type { RunInitOptions } from './init.js';
 export type { FlakehoundConfig, FlakehoundUserConfig } from './config/schema.js';
 export { runAnalyze, applyHistoryWindow } from './run.js';
 export type { RunAnalyzeOptions, RunAnalyzeResult } from './run.js';

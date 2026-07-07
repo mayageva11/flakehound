@@ -1,11 +1,34 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
+import pc from 'picocolors';
 import { runExplain } from './explain.js';
 import { VERSION } from './index.js';
+import { runInit } from './init.js';
 import { runAnalyze } from './run.js';
 import { FlakehoundError } from './util/errors.js';
 
 const program = new Command();
+
+/**
+ * Uniform failure path — exit 2 = the tool broke or was misused, distinct from
+ * exit 1 (a new regression was found) so CI can tell them apart.
+ * FlakehoundErrors are expected states and print as clean guidance; anything
+ * else is a bug, condensed to one line (full stack behind FLAKEHOUND_DEBUG=1).
+ */
+function fail(error: unknown): void {
+  if (error instanceof FlakehoundError) {
+    console.error(`${pc.red(pc.bold('flakehound:'))} ${error.message}`);
+  } else {
+    const detail = error instanceof Error ? error.message : String(error);
+    console.error(`${pc.red(pc.bold('flakehound:'))} unexpected error — ${detail}`);
+    if (process.env['FLAKEHOUND_DEBUG'] === '1') {
+      console.error(error);
+    } else {
+      console.error(pc.dim('  set FLAKEHOUND_DEBUG=1 for a full stack trace'));
+    }
+  }
+  process.exitCode = 2;
+}
 
 program
   .name('flakehound')
@@ -40,14 +63,7 @@ program
         });
         process.exitCode = exitCode;
       } catch (error) {
-        // Exit 2 = the tool broke (parse error, bad config) — distinct from
-        // exit 1 (a new regression was found) so CI can tell them apart.
-        if (error instanceof FlakehoundError) {
-          console.error(`flakehound: ${error.message}`);
-        } else {
-          console.error(error);
-        }
-        process.exitCode = 2;
+        fail(error);
       }
     },
   );
@@ -66,12 +82,19 @@ program
         ...(opts.input !== undefined ? { overrides: { input: opts.input } } : {}),
       });
     } catch (error) {
-      if (error instanceof FlakehoundError) {
-        console.error(`flakehound: ${error.message}`);
-      } else {
-        console.error(error);
-      }
-      process.exitCode = 2;
+      fail(error);
+    }
+  });
+
+program
+  .command('init')
+  .description('Scaffold a commented flakehound.config.ts in the current directory')
+  .option('-f, --force', 'overwrite an existing config file')
+  .action(async (opts: { force?: boolean }) => {
+    try {
+      await runInit({ ...(opts.force === true ? { force: true } : {}) });
+    } catch (error) {
+      fail(error);
     }
   });
 
