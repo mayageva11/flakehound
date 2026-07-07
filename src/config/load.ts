@@ -7,12 +7,21 @@ import { configSchema } from './schema.js';
 import type { FlakehoundConfig } from './schema.js';
 
 /** Resolution order: first existing file wins. */
-const CONFIG_FILES = [
+export const CONFIG_FILES = [
   'flakehound.config.ts',
   'flakehound.config.js',
   'flakehound.config.mjs',
   'flakehound.config.json',
-];
+] as const;
+
+/** The config file `loadConfig` would pick up in `cwd`, or undefined. */
+export function findConfigFile(cwd: string): string | undefined {
+  for (const candidate of CONFIG_FILES) {
+    const abs = path.join(cwd, candidate);
+    if (existsSync(abs)) return abs;
+  }
+  return undefined;
+}
 
 /** CLI flags — they win over config-file values. */
 export interface CliOverrides {
@@ -56,11 +65,7 @@ function resolveConfigPath(cwd: string, explicit: string | undefined): string | 
     }
     return abs;
   }
-  for (const candidate of CONFIG_FILES) {
-    const abs = path.join(cwd, candidate);
-    if (existsSync(abs)) return abs;
-  }
-  return undefined;
+  return findConfigFile(cwd);
 }
 
 async function readConfigFile(filePath: string): Promise<Record<string, unknown>> {

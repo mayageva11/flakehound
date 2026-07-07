@@ -2,13 +2,14 @@ import path from 'node:path';
 import { interpretClusters } from './ai/index.js';
 import type { HypothesisClient } from './ai/index.js';
 import { clusterTestRuns } from './cluster/index.js';
-import { loadConfig } from './config/load.js';
+import { findConfigFile, loadConfig } from './config/load.js';
 import type { CliOverrides } from './config/load.js';
 import { ingest } from './ingest/index.js';
 import type { TestRun } from './ingest/types.js';
 import { computeSignals } from './signal/index.js';
 import { buildReport, diffAgainstBaseline, loadBaseline, renderReport, writeReport } from './report/index.js';
 import type { FlakehoundReport } from './report/index.js';
+import { FlakehoundError } from './util/errors.js';
 
 export interface RunAnalyzeOptions {
   cwd?: string;
@@ -40,7 +41,35 @@ export async function runAnalyze(options: RunAnalyzeOptions = {}): Promise<RunAn
     ...(options.overrides !== undefined ? { overrides: options.overrides } : {}),
   });
 
+  // First-run guidance: no config file, no --input flag → we're guessing with
+  // defaults. Say so once (then proceed — the defaults are legitimate).
+  if (
+    options.configPath === undefined &&
+    options.overrides?.input === undefined &&
+    findConfigFile(cwd) === undefined
+  ) {
+    warn(
+      `flakehound: no flakehound.config.* found — using defaults (input: ${String(config.input)}); run 'npx flakehound init' to scaffold one`,
+    );
+  }
+
   const { runs, summary } = await ingest(config.input, cwd);
+
+  // No-silent-pass policy: a QA gate must never exit 0 having analyzed nothing.
+  // Zero matched files almost always means a misconfigured glob or a runner
+  // that isn't emitting JUnit XML — that's a tool-level error (exit 2).
+  if (summary.filesParsed === 0) {
+    const patterns = Array.isArray(config.input) ? config.input.join("', '") : config.input;
+    throw new FlakehoundError(
+      `no JUnit XML files matched '${patterns}'\n` +
+        `  searched from: ${cwd}\n` +
+        `  Things to check:\n` +
+        `    · does the glob point at your test-results folder? (quote it so the shell doesn't expand it)\n` +
+        `    · is your test runner emitting JUnit XML? (Jest, Playwright, pytest, and JUnit all can)\n` +
+        `    · run 'npx flakehound init' to scaffold a config with a documented input glob`,
+    );
+  }
+
   const windowed = applyHistoryWindow(runs, config.historyDays, now);
 
   const signals = computeSignals(windowed, config.signal);
