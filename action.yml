@@ -1,7 +1,8 @@
 name: flakehound
+# Marketplace requires < 125 characters.
 description: >-
-  Root-cause analysis for flaky tests: analyze a JUnit XML history, gate CI on
-  NEW regressions only, and optionally post the summary as a PR comment.
+  Root-cause analysis for flaky tests. Clusters JUnit XML history and gates CI
+  on new regressions only.
 branding:
   icon: activity
   color: purple
