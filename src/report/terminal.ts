@@ -61,11 +61,17 @@ export function renderReport(report: FlakehoundReport): string {
     if (signal.history.length > 0) lines.push(`      ${renderRunStrip(signal.history)}`);
   }
 
-  lines.push('', pc.bold(`Failure clusters (${clusters.length}) — ranked by impact`));
+  const clusterHeadline =
+    gate.baselineUsed && clusters.length > 0
+      ? ` · ${gate.newClusters.length} new since baseline`
+      : '';
+  lines.push('', pc.bold(`Failure clusters (${clusters.length}) — ranked by impact${clusterHeadline}`));
   if (clusters.length === 0) lines.push(pc.dim('  none'));
+  const newClusterIds = new Set(gate.newClusters);
   for (const [index, cluster] of rankByImpact(clusters).entries()) {
+    const newBadge = gate.baselineUsed && newClusterIds.has(cluster.id) ? ` ${pc.red(pc.bold('NEW'))}` : '';
     lines.push(
-      `  ${index + 1}. [${cluster.id}] ${cluster.occurrences} occurrence(s) across ${cluster.tests.length} test(s), ${cluster.firstSeen} → ${cluster.lastSeen}`,
+      `  ${index + 1}. [${cluster.id}]${newBadge} ${cluster.occurrences} occurrence(s) across ${cluster.tests.length} test(s), ${cluster.firstSeen} → ${cluster.lastSeen}`,
     );
     if (cluster.hypothesis !== undefined) {
       lines.push(

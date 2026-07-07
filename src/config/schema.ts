@@ -19,6 +19,11 @@ export const configSchema = z.object({
   cluster: z
     .object({
       similarityThreshold: z.number().min(0).max(1).default(0.7),
+      /**
+       * 'head' weights error-class/message tokens double so the bug's identity
+       * dominates shared library frames; 'uniform' is the original Jaccard.
+       */
+      weighting: z.enum(['head', 'uniform']).default('head'),
     })
     .prefault({}),
   ai: z

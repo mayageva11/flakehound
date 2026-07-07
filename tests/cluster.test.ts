@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { clusterFailures, clusterTestRuns } from '../src/cluster/index.js';
-import { JaccardSimilarity } from '../src/cluster/similarity.js';
+import { clusterFailures, clusterTestRuns, normalizeTrace } from '../src/cluster/index.js';
+import { JaccardSimilarity, WeightedJaccardSimilarity } from '../src/cluster/similarity.js';
 import type { FailureOccurrence } from '../src/cluster/cluster.js';
 import type { TestRun } from '../src/ingest/types.js';
 
@@ -39,6 +39,75 @@ describe('JaccardSimilarity', () => {
   it('handles empty sets: both empty → identical, one empty → disjoint', () => {
     expect(metric.compare(set(), set())).toBe(1);
     expect(metric.compare(set(), set('a'))).toBe(0);
+  });
+});
+
+describe('WeightedJaccardSimilarity', () => {
+  const metric = new WeightedJaccardSimilarity();
+
+  it('reduces exactly to plain Jaccard when every token is a head token', () => {
+    const plain = new JaccardSimilarity();
+    const a = normalizeTrace('WidgetError alpha beta gamma');
+    const b = normalizeTrace('WidgetError alpha beta delta');
+    expect(metric.compare(a, b)).toBeCloseTo(plain.compare(a.tokens, b.tokens));
+  });
+
+  it('head tokens dominate frame tokens', () => {
+    // identical heads, disjoint frames → similarity pulled UP by the head
+    const sameHead = metric.compare(
+      normalizeTrace('QuotaError: limit reached\n    at alpha (a.ts:1:1)'),
+      normalizeTrace('QuotaError: limit reached\n    at beta (b.ts:2:2)'),
+    );
+    // disjoint heads, identical frames → similarity pulled DOWN by the head
+    const sameFrames = metric.compare(
+      normalizeTrace('AlphaError: expired\n    at helper (lib/retry.ts:1:1)'),
+      normalizeTrace('BetaError: closed\n    at helper (lib/retry.ts:2:2)'),
+    );
+    expect(sameHead).toBeGreaterThan(sameFrames);
+  });
+
+  it('handles empty inputs: both empty → identical, one empty → disjoint', () => {
+    const empty = normalizeTrace('');
+    const some = normalizeTrace('Error: x');
+    expect(metric.compare(empty, empty)).toBe(1);
+    expect(metric.compare(empty, some)).toBe(0);
+  });
+});
+
+describe('clusterFailures — head weighting (default)', () => {
+  // Two DIFFERENT bugs whose traces share a deep library call path. Uniform
+  // Jaccard merges them (11 shared frame tokens / 15 union = 0.73 ≥ 0.7) — a
+  // false merge, the failure mode the tool must avoid. Head weighting keeps
+  // them apart because the error heads are disjoint.
+  const sharedFrames =
+    '\n    at helper (lib/retry.ts:1:1)\n    at wrapper (lib/queue.ts:2:2)\n    at runner (lib/run.ts:3:3)\n    at dispatch (lib/bus.ts:4:4)\n    at flush (lib/sink.ts:5:5)';
+  const alphaTrace = `AlphaError: expired${sharedFrames}`;
+  const betaTrace = `BetaError: closed${sharedFrames}`;
+
+  it('resists the shared-library-frames false merge that uniform Jaccard commits', () => {
+    const failures = [failure('t1', 1, alphaTrace), failure('t2', 2, betaTrace)];
+    expect(clusterFailures(failures)).toHaveLength(2); // head-weighted: split ✔
+    expect(clusterFailures(failures, { weighting: 'uniform' })).toHaveLength(1); // old metric merged
+  });
+
+  it('merges the same bug surfacing through two call paths (same head, different frames)', () => {
+    const head = 'GammaError: transaction deadlock detected on table orders';
+    const failures = [
+      failure('t1', 1, `${head}\n    at alpha (a.ts:1:1)`),
+      failure('t2', 2, `${head}\n    at beta (b.ts:2:2)`),
+    ];
+    expect(clusterFailures(failures)).toHaveLength(1); // head-weighted: merge ✔
+    expect(clusterFailures(failures, { weighting: 'uniform' })).toHaveLength(2); // old metric split
+  });
+
+  it('DETERMINISM holds under head weighting: shuffled input → identical output', () => {
+    const all = [
+      failure('t1', 1, alphaTrace),
+      failure('t2', 2, betaTrace),
+      failure('t3', 3, `AlphaError: expired${sharedFrames}`),
+    ];
+    const shuffled = [all[2]!, all[0]!, all[1]!];
+    expect(JSON.stringify(clusterFailures(shuffled))).toBe(JSON.stringify(clusterFailures(all)));
   });
 });
 

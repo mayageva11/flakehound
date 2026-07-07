@@ -100,21 +100,41 @@ export interface NormalizedTrace {
    * (that would push toward false merges).
    */
   tokens: ReadonlySet<string>;
+  /**
+   * Tokens from the trace HEAD (the first non-empty line — error class +
+   * message). The head carries the bug's identity far more strongly than deep
+   * stack frames, which are often shared library internals; the head-weighted
+   * metric uses this to resist false merges between unrelated failures that
+   * happen to share frames.
+   */
+  headTokens: ReadonlySet<string>;
 }
 
-export function normalizeTrace(raw: string): NormalizedTrace {
-  let canonical = raw;
+function applyRules(text: string): string {
+  let out = text;
   for (const rule of NORMALIZATION_RULES) {
-    canonical = canonical.replace(rule.pattern, rule.replacement);
+    out = out.replace(rule.pattern, rule.replacement);
   }
-  canonical = canonical.replace(/\s+/g, ' ').trim();
+  return out.replace(/\s+/g, ' ').trim();
+}
 
+function tokenize(normalized: string): Set<string> {
   const tokens = new Set<string>();
-  for (const word of canonical.split(' ')) {
+  for (const word of normalized.split(' ')) {
     const token = trimPunctuation(word);
     if (token !== '' && !PLACEHOLDERS.has(token)) tokens.add(token);
   }
-  return { canonical, tokens };
+  return tokens;
+}
+
+export function normalizeTrace(raw: string): NormalizedTrace {
+  const canonical = applyRules(raw);
+  const head = raw.split('\n').find((line) => line.trim() !== '') ?? '';
+  return {
+    canonical,
+    tokens: tokenize(canonical),
+    headTokens: tokenize(applyRules(head)),
+  };
 }
 
 /**

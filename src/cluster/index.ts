@@ -4,8 +4,8 @@ import type { ClusterConfig, FailureCluster } from './cluster.js';
 
 export { normalizeTrace, NORMALIZATION_RULES } from './normalize.js';
 export type { NormalizationRule, NormalizedTrace } from './normalize.js';
-export { JaccardSimilarity } from './similarity.js';
-export type { SimilarityMetric, TokenSet } from './similarity.js';
+export { JaccardSimilarity, WeightedJaccardSimilarity } from './similarity.js';
+export type { SimilarityMetric, TokenSet, WeightedTokens } from './similarity.js';
 export { clusterFailures, DEFAULT_CLUSTER_CONFIG } from './cluster.js';
 export type { ClusterConfig, FailureCluster, FailureOccurrence } from './cluster.js';
 

@@ -11,6 +11,14 @@ export interface GateResult {
   knownRegressions: string[];
   /** In the baseline but no longer regressing — surfaced as good news. */
   resolvedRegressions: string[];
+  /**
+   * Cluster ids absent from the baseline — "a new unique bug appeared".
+   * Informational only: cluster novelty never changes the exit code; the
+   * regression gate above stays the CI contract.
+   */
+  newClusters: string[];
+  /** Cluster ids matched to a baseline cluster (by id, or by trace similarity). */
+  knownClusters: string[];
 }
 
 export interface ReportSummary {
