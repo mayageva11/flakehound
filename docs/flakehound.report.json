@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-07-06T23:37:45.509Z",
+  "generatedAt": "2026-07-07T09:27:55.940Z",
   "summary": {
     "filesParsed": 4,
     "testRuns": 12,
@@ -46,7 +46,7 @@
       "occurrences": 3,
       "hypothesis": {
         "category": "assertion",
-        "explanation": "The payment-page.ts file contains a bug that causes the cart total to not equal the charged amount in certain scenarios."
+        "explanation": "The test is verifying a specific condition that may not be reliable due to the use of placeholder values."
       }
     },
     {
@@ -60,7 +60,7 @@
       "occurrences": 2,
       "hypothesis": {
         "category": "timeout",
-        "explanation": "The test is repeatedly waiting for a UI element that is not yet available or is taking too long to render."
+        "explanation": "The test is waiting too long for the element to be available on the page."
       }
     }
   ],
