@@ -1,8 +1,9 @@
 # flakehound 🐕
 
+[![ci](https://github.com/mayageva11/flakehound/actions/workflows/ci.yml/badge.svg)](https://github.com/mayageva11/flakehound/actions/workflows/ci.yml)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 ![Node](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-87%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-123%20passing-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
 **Live dashboard:** [mayageva11.github.io/flakehound](https://mayageva11.github.io/flakehound/) — rendered from a real `flakehound.report.json`.
@@ -74,7 +75,24 @@ flakehound is CI-agnostic by construction: its only input is JUnit XML — the o
 
 The gate then fails **once** when a regression lands — not on every run until it's fixed. Two worked examples:
 
-### GitHub Actions
+### GitHub Actions — the reusable action
+
+The repo doubles as a composite action: it runs the analysis, writes a job
+summary, gates on new regressions, and (optionally) upserts one PR comment with
+the verdict, run strips, and clusters:
+
+```yaml
+- uses: mayageva11/flakehound@main
+  with:
+    input-glob: 'test-results/**/*.xml'
+    baseline: flakehound.report.json   # optional
+    comment: 'true'                    # PR comment on pull_request events
+```
+
+Outputs: `exit-code` (`0`/`1`/`2`) and `report-path`. Set
+`fail-on-new-regressions: 'false'` to observe without gating.
+
+### GitHub Actions — raw CLI
 
 Baseline persistence via the cache:
 
@@ -193,3 +211,11 @@ npm test           # vitest — the full suite
 npm run typecheck  # strict TS
 npm run build      # emit dist/
 ```
+
+## Releasing
+
+CI (typecheck + tests + build on Node 20/22, plus an action self-test) runs on
+every push and PR. Publishing to npm is tag-driven: `npm version <x.y.z> &&
+git push --follow-tags` triggers the release workflow, which publishes with
+provenance. One-time setup: add an npm automation token as the `NPM_TOKEN`
+repository secret.

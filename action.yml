@@ -1,0 +1,96 @@
+name: flakehound
+description: >-
+  Root-cause analysis for flaky tests: analyze a JUnit XML history, gate CI on
+  NEW regressions only, and optionally post the summary as a PR comment.
+branding:
+  icon: activity
+  color: purple
+
+inputs:
+  input-glob:
+    description: Glob of JUnit XML files (the run history)
+    required: true
+  baseline:
+    description: Path to the previous flakehound.report.json (regressions in it are known)
+    required: false
+    default: ''
+  report-path:
+    description: Where to write the report artifact
+    required: false
+    default: flakehound.report.json
+  no-ai:
+    description: Disable the AI interpretation layer ('true'/'false')
+    required: false
+    default: 'true'
+  fail-on-new-regressions:
+    description: Fail the step when new regressions are found ('true'/'false')
+    required: false
+    default: 'true'
+  comment:
+    description: Post/update the summary as a PR comment ('true'/'false'; needs pull_request event)
+    required: false
+    default: 'false'
+  github-token:
+    description: Token used for the PR comment
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  exit-code:
+    description: flakehound exit code (0 clean · 1 new regression · 2 tool error)
+    value: ${{ steps.analyze.outputs.exit-code }}
+  report-path:
+    description: Path of the written report artifact
+    value: ${{ inputs.report-path }}
+
+runs:
+  using: composite
+  steps:
+    - name: Build the flakehound CLI from the action checkout
+      shell: bash
+      run: |
+        cd "$GITHUB_ACTION_PATH"
+        npm ci --silent
+        npm run build --silent
+
+    - name: Analyze
+      id: analyze
+      shell: bash
+      run: |
+        set +e
+        args=(analyze --input "${{ inputs.input-glob }}" --json "${{ inputs.report-path }}")
+        [ -n "${{ inputs.baseline }}" ] && args+=(--baseline "${{ inputs.baseline }}")
+        [ "${{ inputs.no-ai }}" = "true" ] && args+=(--no-ai)
+        node "$GITHUB_ACTION_PATH/dist/cli.js" "${args[@]}"
+        rc=$?
+        echo "exit-code=$rc" >> "$GITHUB_OUTPUT"
+        # 2 = the tool broke → always fail. 1 = a new regression → fail only
+        # when the caller wants the gate to bite.
+        if [ "$rc" -eq 2 ]; then exit 2; fi
+        if [ "$rc" -eq 1 ] && [ "${{ inputs.fail-on-new-regressions }}" = "true" ]; then exit 1; fi
+        exit 0
+
+    - name: Job summary
+      if: always() && steps.analyze.outputs.exit-code != '2'
+      shell: bash
+      run: |
+        node "$GITHUB_ACTION_PATH/scripts/report-to-markdown.mjs" "${{ inputs.report-path }}" >> "$GITHUB_STEP_SUMMARY"
+
+    - name: PR comment
+      if: always() && inputs.comment == 'true' && github.event_name == 'pull_request' && steps.analyze.outputs.exit-code != '2'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        REPO: ${{ github.repository }}
+      run: |
+        body_file="$(mktemp)"
+        node "$GITHUB_ACTION_PATH/scripts/report-to-markdown.mjs" "${{ inputs.report-path }}" > "$body_file"
+        # Upsert: one comment per PR, identified by the hidden marker.
+        existing=$(gh api "repos/$REPO/issues/$PR_NUMBER/comments" --paginate \
+          --jq '[.[] | select(.body | contains("<!-- flakehound-report -->"))][0].id' 2>/dev/null || true)
+        if [ -n "$existing" ] && [ "$existing" != "null" ]; then
+          gh api -X PATCH "repos/$REPO/issues/comments/$existing" -F body=@"$body_file" >/dev/null
+        else
+          gh api "repos/$REPO/issues/$PR_NUMBER/comments" -F body=@"$body_file" >/dev/null
+        fi
