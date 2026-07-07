@@ -53,6 +53,15 @@ describe('flakehound end-to-end', () => {
     const login = report.signals.find((s) => s.testId === 'shop.spec.ts > login');
     expect(login?.classification).toBe('stable');
 
+    // every signal publishes its per-run evidence trail, chronological
+    for (const signal of report.signals) {
+      expect(signal.history).toHaveLength(4); // 4 runs in the fixture history
+      const stamps = signal.history.map((h) => h.timestamp);
+      expect([...stamps].sort()).toEqual(stamps);
+    }
+    expect(payment?.history.map((h) => h.verdict)).toEqual(['pass', 'fail', 'fail', 'fail']);
+    expect(checkout?.history.map((h) => h.verdict)).toEqual(['pass', 'fail', 'pass', 'fail']);
+
     // 5 failures = 2 unique causes: the timeout cluster and the assertion cluster
     expect(report.clusters).toHaveLength(2);
     const sizes = report.clusters.map((c) => c.occurrences).sort();

@@ -186,3 +186,38 @@ describe('computeSignals', () => {
     expect(computeSignals(all).map((s) => s.testId)).toEqual(['broken', 'flaky', 'retried']);
   });
 });
+
+describe('TestSignal.history — the published evidence trail', () => {
+  it('is chronological, one entry per execution, with verdict/commit/retryFlips', () => {
+    const runs = [
+      // deliberately out of order: history must come back sorted
+      run('t', 'fail', { sha: 'bbb2222', day: 3, runId: 'r3' }),
+      run('t', 'pass', { sha: 'aaa1111', day: 1, runId: 'r1' }),
+      run('t', 'fail', { sha: 'bbb2222', day: 2, runId: 'r2' }), // first attempt…
+      run('t', 'pass', { sha: 'bbb2222', day: 2, runId: 'r2' }), // …retry flip
+    ];
+    const signal = signalFor(runs, 't');
+    expect(signal.history).toEqual([
+      { timestamp: '2026-07-01T10:00:00.000Z', commitSha: 'aaa1111', verdict: 'pass', retryFlips: 0 },
+      { timestamp: '2026-07-02T10:00:00.000Z', commitSha: 'bbb2222', verdict: 'pass', retryFlips: 1 },
+      { timestamp: '2026-07-03T10:00:00.000Z', commitSha: 'bbb2222', verdict: 'fail', retryFlips: 0 },
+    ]);
+  });
+
+  it('omits commitSha when metadata is absent and records skips', () => {
+    const runs = [
+      run('t', 'pass', { day: 1, runId: 'r1' }),
+      run('t', 'skip', { day: 2, runId: 'r2' }),
+      run('t', 'fail', { day: 3, runId: 'r3' }),
+    ];
+    const signal = signalFor(runs, 't');
+    expect(signal.history.map((h) => h.verdict)).toEqual(['pass', 'skip', 'fail']);
+    expect(signal.history.every((h) => !('commitSha' in h))).toBe(true);
+  });
+
+  it('is present on every classification, including insufficient-data', () => {
+    const one = signalFor([run('t', 'pass', { day: 1, runId: 'r1' })], 't');
+    expect(one.classification).toBe('insufficient-data');
+    expect(one.history).toHaveLength(1);
+  });
+});

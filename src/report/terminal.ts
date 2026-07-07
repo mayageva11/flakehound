@@ -1,8 +1,24 @@
 import pc from 'picocolors';
 import type { InterpretedCluster } from '../ai/types.js';
+import type { HistoryEntry } from '../signal/types.js';
 import type { FlakehoundReport } from './types.js';
 
 const TRACE_PREVIEW_LENGTH = 160;
+
+/**
+ * Compact chronological run strip: ✓ pass · ✗ fail · - skip, with ↻ appended to
+ * an execution that flipped on retry. Makes the flips visible in the terminal,
+ * not just asserted in prose.
+ */
+function renderRunStrip(history: HistoryEntry[]): string {
+  const glyphs = history.map((entry) => {
+    const flip = entry.retryFlips > 0 ? pc.yellow('↻') : '';
+    if (entry.verdict === 'pass') return pc.green('✓') + flip;
+    if (entry.verdict === 'fail') return pc.red('✗') + flip;
+    return pc.dim('-');
+  });
+  return `runs: ${glyphs.join(' ')}`;
+}
 
 export function renderReport(report: FlakehoundReport): string {
   const { summary, signals, clusters, gate } = report;
@@ -32,6 +48,7 @@ export function renderReport(report: FlakehoundReport): string {
   for (const signal of regressions) {
     lines.push(`  ${pc.red('✗')} ${signal.testId} — broken since ${signal.brokenSinceSha}`);
     if (signal.reason !== undefined) lines.push(pc.dim(`      ${signal.reason}`));
+    if (signal.history.length > 0) lines.push(`      ${renderRunStrip(signal.history)}`);
   }
 
   lines.push('', pc.bold(pc.yellow(`Flaky tests — quarantine candidates (${flaky.length})`)));
@@ -41,6 +58,7 @@ export function renderReport(report: FlakehoundReport): string {
       `  ${pc.yellow('~')} ${signal.testId} — score ${signal.flakinessScore.toFixed(2)} (${signal.confidence} confidence)`,
     );
     if (signal.reason !== undefined) lines.push(pc.dim(`      ${signal.reason}`));
+    if (signal.history.length > 0) lines.push(`      ${renderRunStrip(signal.history)}`);
   }
 
   lines.push('', pc.bold(`Failure clusters (${clusters.length}) — ranked by impact`));

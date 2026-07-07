@@ -4,8 +4,10 @@ export { defineConfig } from './config/define-config.js';
 export { loadConfig } from './config/load.js';
 export type { CliOverrides } from './config/load.js';
 export type { FlakehoundConfig, FlakehoundUserConfig } from './config/schema.js';
-export { runAnalyze } from './run.js';
+export { runAnalyze, applyHistoryWindow } from './run.js';
 export type { RunAnalyzeOptions, RunAnalyzeResult } from './run.js';
+export { runExplain } from './explain.js';
+export type { RunExplainOptions } from './explain.js';
 export {
   buildReport,
   diffAgainstBaseline,
@@ -54,6 +56,7 @@ export { computeSignals, DEFAULT_SIGNAL_CONFIG } from './signal/index.js';
 export type {
   Classification,
   Confidence,
+  HistoryEntry,
   SignalConfig,
   TestSignal,
 } from './signal/types.js';

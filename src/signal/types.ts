@@ -7,6 +7,15 @@ export type Classification =
 
 export type Confidence = 'high' | 'medium' | 'low';
 
+/** One execution in a test's chronological run history, as published in the report. */
+export interface HistoryEntry {
+  timestamp: string;
+  commitSha?: string;
+  verdict: 'pass' | 'fail' | 'skip';
+  /** Intra-run pass↔fail flips (>0 marks a retry flip — the strongest flaky signal). */
+  retryFlips: number;
+}
+
 export interface TestSignal {
   testId: string;
   /** Weighted transitions / opportunities, capped at 1. Not a naive fail rate. */
@@ -16,6 +25,12 @@ export interface TestSignal {
   reason?: string;
   /** Set only when classification is 'regression'. */
   brokenSinceSha?: string;
+  /**
+   * Chronological per-run history inside the analysis window — the evidence
+   * behind the classification, so reports and dashboards can SHOW the flips
+   * rather than just assert them.
+   */
+  history: HistoryEntry[];
 }
 
 export interface SignalConfig {

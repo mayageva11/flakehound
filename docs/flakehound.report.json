@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-07-07T09:27:55.940Z",
+  "generatedAt": "2026-07-07T10:18:22.554Z",
   "summary": {
     "filesParsed": 4,
     "testRuns": 12,
@@ -17,13 +17,65 @@
       "flakinessScore": 1,
       "classification": "flaky",
       "confidence": "medium",
-      "reason": "1 pass↔fail transition(s) on the same commit"
+      "reason": "1 pass↔fail transition(s) on the same commit",
+      "history": [
+        {
+          "timestamp": "2026-07-01T10:00:00.000Z",
+          "commitSha": "aaa1111",
+          "verdict": "pass",
+          "retryFlips": 0
+        },
+        {
+          "timestamp": "2026-07-02T10:00:00.000Z",
+          "commitSha": "bbb2222",
+          "verdict": "fail",
+          "retryFlips": 0
+        },
+        {
+          "timestamp": "2026-07-03T10:00:00.000Z",
+          "commitSha": "bbb2222",
+          "verdict": "pass",
+          "retryFlips": 0
+        },
+        {
+          "timestamp": "2026-07-04T10:00:00.000Z",
+          "commitSha": "ccc3333",
+          "verdict": "fail",
+          "retryFlips": 0
+        }
+      ]
     },
     {
       "testId": "shop.spec.ts > login",
       "flakinessScore": 0,
       "classification": "stable",
-      "confidence": "high"
+      "confidence": "high",
+      "history": [
+        {
+          "timestamp": "2026-07-01T10:00:00.000Z",
+          "commitSha": "aaa1111",
+          "verdict": "pass",
+          "retryFlips": 0
+        },
+        {
+          "timestamp": "2026-07-02T10:00:00.000Z",
+          "commitSha": "bbb2222",
+          "verdict": "pass",
+          "retryFlips": 0
+        },
+        {
+          "timestamp": "2026-07-03T10:00:00.000Z",
+          "commitSha": "bbb2222",
+          "verdict": "pass",
+          "retryFlips": 0
+        },
+        {
+          "timestamp": "2026-07-04T10:00:00.000Z",
+          "commitSha": "ccc3333",
+          "verdict": "pass",
+          "retryFlips": 0
+        }
+      ]
     },
     {
       "testId": "shop.spec.ts > payment",
@@ -31,7 +83,33 @@
       "classification": "regression",
       "confidence": "high",
       "reason": "failing in 100% of the last 3 run(s) since commit bbb2222; passed before it",
-      "brokenSinceSha": "bbb2222"
+      "brokenSinceSha": "bbb2222",
+      "history": [
+        {
+          "timestamp": "2026-07-01T10:00:00.000Z",
+          "commitSha": "aaa1111",
+          "verdict": "pass",
+          "retryFlips": 0
+        },
+        {
+          "timestamp": "2026-07-02T10:00:00.000Z",
+          "commitSha": "bbb2222",
+          "verdict": "fail",
+          "retryFlips": 0
+        },
+        {
+          "timestamp": "2026-07-03T10:00:00.000Z",
+          "commitSha": "bbb2222",
+          "verdict": "fail",
+          "retryFlips": 0
+        },
+        {
+          "timestamp": "2026-07-04T10:00:00.000Z",
+          "commitSha": "ccc3333",
+          "verdict": "fail",
+          "retryFlips": 0
+        }
+      ]
     }
   ],
   "clusters": [
@@ -46,7 +124,7 @@
       "occurrences": 3,
       "hypothesis": {
         "category": "assertion",
-        "explanation": "The test is verifying a specific condition that may not be reliable due to the use of placeholder values."
+        "explanation": "The failure is likely due to an incorrect or inconsistent calculation in the PaymentPage.verify method."
       }
     },
     {
@@ -60,7 +138,7 @@
       "occurrences": 2,
       "hypothesis": {
         "category": "timeout",
-        "explanation": "The test is waiting too long for the element to be available on the page."
+        "explanation": "The test is waiting too long for an element to become available on the page, likely due to a slow or unresponsive web application."
       }
     }
   ],
