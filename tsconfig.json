@@ -17,5 +17,6 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["src", "tests", "vitest.config.ts"]
+  "include": ["src", "tests", "vitest.config.ts"],
+  "exclude": ["tests/fixtures/quarantine"]
 }

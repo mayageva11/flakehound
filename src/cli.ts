@@ -4,6 +4,7 @@ import pc from 'picocolors';
 import { runExplain } from './explain.js';
 import { VERSION } from './index.js';
 import { runInit } from './init.js';
+import { runQuarantine } from './quarantine/index.js';
 import { runAnalyze } from './run.js';
 import { FlakehoundError } from './util/errors.js';
 
@@ -85,6 +86,54 @@ program
       fail(error);
     }
   });
+
+program
+  .command('quarantine')
+  .description(
+    'Quarantine high-confidence flaky tests from the last report (dry-run by default)',
+  )
+  .option('-c, --config <path>', 'path to flakehound config file')
+  .option('--report <path>', 'flakehound.report.json to read (default: the configured output)')
+  .option('--state <path>', 'quarantine state file (default: flakehound.quarantine.json)')
+  .option('--apply', 'edit the spec files (default is a dry-run that touches nothing)')
+  .option('--commit', 'create a branch and commit the edits — implies --apply')
+  .option('--pr', 'push the branch and open a GitHub PR — implies --commit')
+  .option('--branch <name>', 'branch name for --commit/--pr')
+  .option('--no-issues', 'skip GitHub issue creation/closing')
+  .action(
+    async (opts: {
+      config?: string;
+      report?: string;
+      state?: string;
+      apply?: boolean;
+      commit?: boolean;
+      pr?: boolean;
+      branch?: string;
+      issues: boolean;
+    }) => {
+      try {
+        const mode =
+          opts.pr === true
+            ? 'pr'
+            : opts.commit === true
+              ? 'commit'
+              : opts.apply === true
+                ? 'apply'
+                : 'dry-run';
+        const { exitCode } = await runQuarantine({
+          mode,
+          ...(opts.config !== undefined ? { configPath: opts.config } : {}),
+          ...(opts.report !== undefined ? { reportPath: opts.report } : {}),
+          ...(opts.state !== undefined ? { statePath: opts.state } : {}),
+          ...(opts.branch !== undefined ? { branch: opts.branch } : {}),
+          ...(opts.issues === false ? { issues: false } : {}),
+        });
+        process.exitCode = exitCode;
+      } catch (error) {
+        fail(error);
+      }
+    },
+  );
 
 program
   .command('init')

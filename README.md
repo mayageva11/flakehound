@@ -4,7 +4,7 @@
 [![ci](https://github.com/mayageva11/flakehound/actions/workflows/ci.yml/badge.svg)](https://github.com/mayageva11/flakehound/actions/workflows/ci.yml)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 ![Node](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-133%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-214%20passing-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
 **Live dashboard:** [mayageva11.github.io/flakehound](https://mayageva11.github.io/flakehound/) — rendered from a real `flakehound.report.json`.
@@ -64,6 +64,7 @@ no per-runner adapters, no account.
 |---|---|
 | `flakehound analyze` | Analyze the JUnit XML history: score flakiness, isolate regressions, cluster failures, gate CI |
 | `flakehound explain <testId>` | One test's run-by-run story: history table, classification reasoning, its clusters |
+| `flakehound quarantine` | Tag high-confidence flaky tests in their spec files, file tracking issues, auto-release when stable — dry-run by default ([details](#quarantine)) |
 | `flakehound init` | Scaffold a fully commented `flakehound.config.ts` (never overwrites; `--force` to replace) |
 
 ### `analyze` flags
@@ -185,6 +186,15 @@ export default defineConfig({
       model: 'llama3.2',
     },
   },
+  quarantine: {
+    scoreThreshold: 0.2,      // unset = mirrors signal.flakinessThreshold
+    stableRunsToRelease: 10,  // clean passes required to auto-release
+    criticalTests: [],        // test ids never to auto-quarantine
+    github: {
+      createIssues: true,     // one issue per quarantined test (GITHUB_TOKEN)
+      repo: 'owner/repo',     // unset = inferred from the origin remote
+    },
+  },
 });
 ```
 
@@ -204,6 +214,56 @@ The hypothesis source sits behind a single `HypothesisProvider` interface, so *w
 
 This is a separation-of-concerns decision, not a feature bolt-on: adding a provider is implementing one method, selection is an explicit chain, and every failure path (unreachable endpoint, malformed JSON from a small local model, off-schema reply, timeout) degrades to *no hypothesis* with a single warning — the run never hangs or crashes. Small local models are noisier than a hosted model, so that graceful-degradation contract is enforced identically for both providers and covered by tests.
 
+## Quarantine
+
+`flakehound quarantine` is the free, git-native answer to paid flaky-test quarantine services: it reads the latest `flakehound.report.json`, tags high-confidence flaky tests in their Playwright spec files, files one GitHub issue per test, and releases each test automatically once it has proven stable — through a PR you review, never a silent edit.
+
+A test qualifies when it is classified `flaky` with **high** confidence and its `flakinessScore` is at or above `quarantine.scoreThreshold` (unset = mirrors `signal.flakinessThreshold`, so detection and quarantine can't drift apart). Tests listed in `quarantine.criticalTests` are never touched.
+
+### What an edit looks like
+
+The annotator makes a minimal, formatting-preserving AST edit (ts-morph, not regex): a [Playwright tag](https://playwright.dev/docs/test-annotations#tag-tests) (needs Playwright ≥ 1.42) plus a machine-readable marker a later run can find and reverse:
+
+```ts
+// flakehound-quarantined cluster=7a7c11808d52 issue=https://github.com/o/r/issues/12 — managed by 'flakehound quarantine', do not edit
+test('checkout', { tag: '@flakehound-quarantined' }, async ({ page }) => {
+```
+
+Quarantined tests are tracked in `flakehound.quarantine.json` — **commit it**: it's what prevents duplicate quarantines and duplicate issues across runs (the `--commit`/`--pr` paths include it automatically).
+
+### Quarantined ≠ skipped: the two-lane pattern
+
+The tag deliberately does **not** `fixme` the test — a skipped test produces no evidence and could never earn its way back. Instead, CI splits into two lanes and quarantined tests keep producing signal:
+
+```yaml
+# blocking lane — quarantined tests can't fail the build
+- run: npx playwright test --grep-invert "@flakehound-quarantined"
+
+# non-blocking lane — quarantined tests keep running, keep emitting JUnit XML
+- run: npx playwright test --grep "@flakehound-quarantined"
+  continue-on-error: true
+```
+
+Because the quarantine lane still feeds `flakehound analyze`, release is automatic: after `quarantine.stableRunsToRelease` consecutive clean passes since quarantining (default 10 — failures, skips, and retry flips all reset the streak), the next `flakehound quarantine` run removes the tag and marker, closes the linked issue with a comment, and prunes the state file.
+
+### Escalation ladder — nothing happens without a flag
+
+| Flag | Effect |
+|---|---|
+| *(none)* | **dry-run**: print exactly what would happen, touch nothing |
+| `--apply` | edit spec files + state file in the working tree |
+| `--commit` | `--apply`, then create a branch and commit (no push) |
+| `--pr` | `--commit`, then push and open a GitHub PR |
+| `--branch <name>` | branch name (default `flakehound/quarantine-<date>`) |
+| `--report` / `--state <path>` | override the artifact locations |
+| `--no-issues` | skip GitHub issue creation/closing |
+
+**Exit codes** keep the house convention: `0` nothing to do · `1` actions taken — or, in dry-run, *proposed*, so a CI job can dry-run and treat exit `1` as "quarantine work exists, re-run with `--pr`" · `2` tool error. As with `analyze`, `1` means "found something", not "broke".
+
+GitHub integration degrades exactly like the AI layer: no `GITHUB_TOKEN` or no resolvable repo → the tests are still quarantined, just without issues, with one warning. The one hard requirement is `--pr` itself — a PR that can't be opened after the branch was pushed is an error, not a warning. The repo comes from `quarantine.github.repo` (`"owner/repo"`) or is inferred from the `origin` remote.
+
+Currently Playwright-only; the edit logic sits behind a `QuarantineAnnotator` interface (mirroring `HypothesisProvider`), so another framework is one implementation away. Test ids that don't map back to a source file (pytest/JUnit class names) — and anything else ambiguous, from duplicate titles to computed template-literal titles — are skipped with a warning: **flakehound never guesses which test to edit**.
+
 ## Architecture
 
 ```
@@ -215,6 +275,8 @@ src/
 │                 (Ollama / Anthropic) — thin, at the edge, never source of truth
 ├── config/      flakehound.config.ts via jiti, zod-validated, flag overrides
 ├── report/      terminal report, JSON artifact, baseline diff (CI gate)
+├── quarantine/  opt-in quarantine: ts-morph tag edits behind a QuarantineAnnotator
+│                 interface, state file, GitHub issues/PRs (injectable Octokit/git)
 ├── run.ts       pipeline orchestrator (injectable clock/client/streams)
 └── cli.ts       commander entry point
 ```
@@ -225,7 +287,7 @@ src/
 - **Prefer false-split over false-merge.** A merged pair of distinct bugs hides a defect; a split bug is a duplicate resolved by eye. Every normalization rule must be justifiable as *unambiguously volatile* — which is why line numbers are stripped but HTTP status codes are preserved.
 - **Flakiness ≠ fail rate.** A test failing 100% of the time isn't flaky — it's broken. Scoring counts pass↔fail *transitions* on the same commit (and retry flips within a run), and the regression classifier runs first, mutually exclusive.
 - **Graceful degradation as a contract.** Missing metadata is a first-class case: signals downgrade confidence and say why, instead of guessing or crashing.
-- **A QA tool practices what it preaches.** Every non-trivial module is unit-tested (133 tests), including shuffled-input determinism and exact threshold boundaries.
+- **A QA tool practices what it preaches.** Every non-trivial module is unit-tested (214 tests), including shuffled-input determinism and exact threshold boundaries.
 
 ## Development
 

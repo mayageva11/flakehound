@@ -2,6 +2,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { defineConfig } from '../src/config/define-config.js';
 import { loadConfig } from '../src/config/load.js';
+import { configSchema } from '../src/config/schema.js';
 import { FlakehoundError } from '../src/util/errors.js';
 
 function projectDir(name: string): string {
@@ -31,6 +32,29 @@ describe('loadConfig', () => {
     expect(config.input).toBe('reports/**/*.xml');
     expect(config.signal.minRuns).toBe(3);
     expect(config.ai.enabled).toBe(true);
+  });
+
+  it('resolves quarantine defaults (opt-in, mirrored threshold left unset)', async () => {
+    const config = await loadConfig({ cwd: projectDir('empty-project') });
+    expect(config.quarantine).toEqual({
+      enabled: false,
+      stableRunsToRelease: 10,
+      criticalTests: [],
+      framework: 'playwright',
+      github: { createIssues: true },
+      state: 'flakehound.quarantine.json',
+    });
+    expect(config.quarantine.scoreThreshold).toBeUndefined();
+  });
+
+  it('validates quarantine.github.repo as "owner/repo"', () => {
+    expect(configSchema.safeParse({ quarantine: { github: { repo: 'o/r' } } }).success).toBe(true);
+    expect(configSchema.safeParse({ quarantine: { github: { repo: 'not a slug' } } }).success).toBe(
+      false,
+    );
+    expect(
+      configSchema.safeParse({ quarantine: { github: { repo: 'too/many/parts' } } }).success,
+    ).toBe(false);
   });
 
   it('CLI flags override config-file values', async () => {

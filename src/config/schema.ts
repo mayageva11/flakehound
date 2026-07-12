@@ -45,6 +45,31 @@ export const configSchema = z.object({
         .prefault({}),
     })
     .prefault({}),
+  quarantine: z
+    .object({
+      /** Reserved for future analyze-integrated automation; running the subcommand is the opt-in. */
+      enabled: z.boolean().default(false),
+      /** Minimum flakinessScore to quarantine. Unset = mirrors signal.flakinessThreshold. */
+      scoreThreshold: z.number().min(0).max(1).optional(),
+      /** Consecutive clean passes (after quarantine) required to auto-release. */
+      stableRunsToRelease: z.number().int().min(1).default(10),
+      /** Test ids that must never be auto-quarantined. */
+      criticalTests: z.array(z.string().min(1)).default([]),
+      framework: z.enum(['playwright']).default('playwright'),
+      github: z
+        .object({
+          createIssues: z.boolean().default(true),
+          /** "owner/repo"; unset = inferred from the git remote 'origin'. */
+          repo: z
+            .string()
+            .regex(/^[^/\s]+\/[^/\s]+$/, 'expected "owner/repo"')
+            .optional(),
+        })
+        .prefault({}),
+      /** Where the quarantine state artifact lives. */
+      state: z.string().min(1).default('flakehound.quarantine.json'),
+    })
+    .prefault({}),
   /** Previous flakehound.report.json for the CI gate. */
   baseline: z.string().min(1).optional(),
   /** Where to write the report artifact. */

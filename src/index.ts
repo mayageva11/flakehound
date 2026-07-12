@@ -73,4 +73,24 @@ export type {
   SignalConfig,
   TestSignal,
 } from './signal/types.js';
+export {
+  DEFAULT_QUARANTINE_CONFIG,
+  PlaywrightAnnotator,
+  QUARANTINE_TAG,
+  runQuarantine,
+} from './quarantine/index.js';
+export type {
+  AnnotateResult,
+  AnnotationTarget,
+  IssueClient,
+  GitRunner,
+  MarkerInfo,
+  QuarantineAnnotator,
+  QuarantineConfig,
+  QuarantineEntry,
+  QuarantineMode,
+  QuarantineState,
+  RunQuarantineOptions,
+  RunQuarantineResult,
+} from './quarantine/index.js';
 export { FlakehoundError } from './util/errors.js';

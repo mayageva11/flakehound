@@ -64,6 +64,26 @@ export default {
     },
   },
 
+  /**
+   * Optional: \`flakehound quarantine\` — tag high-confidence flaky tests
+   * (Playwright ≥ 1.42) so CI can skip them in the blocking lane, with GitHub
+   * issues and automatic release once stable. Dry-run by default.
+   */
+  // quarantine: {
+  //   /** Quarantine at or above this score. Unset = mirrors signal.flakinessThreshold. */
+  //   scoreThreshold: 0.2,
+  //   /** Consecutive clean passes required to auto-release a quarantined test. */
+  //   stableRunsToRelease: 10,
+  //   /** Test ids that must never be auto-quarantined. */
+  //   criticalTests: [],
+  //   github: {
+  //     /** File one GitHub issue per quarantined test (needs GITHUB_TOKEN). */
+  //     createIssues: true,
+  //     /** "owner/repo" — unset infers it from the git remote 'origin'. */
+  //     repo: 'owner/repo',
+  //   },
+  // },
+
   /** Previous report for the CI gate — new regressions fail, known ones don't. */
   // baseline: 'flakehound.report.json',
 
