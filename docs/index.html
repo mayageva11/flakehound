@@ -431,6 +431,54 @@
   .run-history .rh-cell.skip { background: rgba(148, 163, 184, 0.25); }
   .run-history .rh-cell.flip { outline: 2px solid var(--warning); outline-offset: 1px; }
 
+  /* ── Quarantine panel ───────────────────────────────── */
+  .section-dot.purple { background: #a78bfa; box-shadow: 0 0 8px #a78bfa; }
+  .card.qrt { border-left: 3px solid #a78bfa; }
+  .q-chip {
+    font-family: var(--mono); font-size: 10px; font-weight: 700;
+    color: #a78bfa; border: 1px solid rgba(167, 139, 250, 0.35);
+    background: rgba(167, 139, 250, 0.08); border-radius: 4px; padding: 1px 6px;
+    text-decoration: none; display: inline-block; flex-shrink: 0; cursor: pointer;
+  }
+  .q-chip:hover { background: rgba(167, 139, 250, 0.16); }
+  .q-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; align-items: center; }
+  .q-file {
+    font-family: var(--mono); font-size: 11px; color: var(--text-muted);
+    background: rgba(0, 0, 0, 0.25); border: 1px solid var(--border);
+    border-radius: 4px; padding: 1px 6px;
+  }
+  .q-issue-link {
+    font-family: var(--mono); font-size: 11px; color: #38bdf8;
+    border: 1px solid rgba(14, 165, 233, 0.3); background: rgba(14, 165, 233, 0.06);
+    border-radius: 4px; padding: 1px 6px; text-decoration: none;
+  }
+  .q-issue-link:hover { background: rgba(14, 165, 233, 0.14); }
+  .q-issue-none {
+    font-family: var(--mono); font-size: 11px; color: var(--text-muted);
+    border: 1px dashed var(--border); border-radius: 4px; padding: 1px 6px;
+  }
+  .release-progress { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .release-progress .rp-label {
+    font-family: var(--mono); font-size: 10px; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .release-progress .rp-cells { display: flex; gap: 3px; }
+  .release-progress .rp-cell {
+    width: 12px; height: 12px; border-radius: 3px;
+    border: 1px solid rgba(255, 255, 255, 0.12); background: rgba(0, 0, 0, 0.3);
+  }
+  .release-progress .rp-cell.done { background: var(--success); box-shadow: 0 0 6px rgba(16, 185, 129, 0.4); }
+  .release-progress .rp-val { font-family: var(--mono); font-size: 11px; color: var(--text-muted); }
+  .q-note {
+    margin-top: 14px; padding: 10px 12px; border-radius: 8px;
+    border-left: 3px solid rgba(167, 139, 250, 0.4); background: rgba(167, 139, 250, 0.04);
+    color: var(--text-muted); font-size: 12px; line-height: 1.5;
+  }
+  .q-note code {
+    font-family: var(--mono); color: #a78bfa; background: rgba(167, 139, 250, 0.1);
+    padding: 1px 5px; border-radius: 3px; font-size: 11px;
+  }
+
   .chip {
     font-family: var(--mono);
     font-size: 10px;
@@ -981,7 +1029,7 @@
       <svg style="width: 14px; height: 14px; vertical-align: middle; fill: currentColor; margin-right: 4px;" viewBox="0 0 24 24">
         <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
       </svg>
-      How this works — A three-stage analysis chain
+      How this works — A four-stage analysis chain
     </h2>
     <ol class="stepper">
       <li class="step-item">
@@ -1008,6 +1056,15 @@
           <div class="step-title">Dashboard View Layer</div>
           <div class="step-desc">
             The CLI outputs <code>flakehound.report.json</code>. This dashboard consumes the JSON artifact and structures the metrics, signal tabs, clusters, and timeline views shown above.
+          </div>
+        </div>
+      </li>
+      <li class="step-item">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <div class="step-title">Quarantine &amp; Auto-Release via <code>flakehound quarantine</code></div>
+          <div class="step-desc">
+            High-confidence flaky tests are tagged <code>@flakehound-quarantined</code> in their spec files with a surgical AST edit, and a GitHub issue is filed per test. The blocking CI lane excludes the tag while a non-blocking lane keeps running the tests — so once a test posts enough consecutive clean passes, flakehound removes the tag, closes the issue, and restores the file byte-identically. Nothing is ever skipped into oblivion.
           </div>
         </div>
       </li>
@@ -1039,8 +1096,17 @@ const FALLBACK_REPORT = {
       "testId": "shop.spec.ts > checkout",
       "flakinessScore": 1,
       "classification": "flaky",
-      "confidence": "medium",
-      "reason": "1 pass↔fail transition(s) on the same commit"
+      "confidence": "high",
+      "reason": "1 intra-run retry flip; 1 pass↔fail transition(s) on the same commit",
+      "history": [
+        { "timestamp": "2026-07-01T10:00:00.000Z", "commitSha": "aaa1111", "verdict": "pass", "retryFlips": 0 },
+        { "timestamp": "2026-07-02T10:00:00.000Z", "commitSha": "bbb2222", "verdict": "fail", "retryFlips": 0 },
+        { "timestamp": "2026-07-03T10:00:00.000Z", "commitSha": "bbb2222", "verdict": "pass", "retryFlips": 1 },
+        { "timestamp": "2026-07-04T10:00:00.000Z", "commitSha": "ccc3333", "verdict": "fail", "retryFlips": 0 },
+        { "timestamp": "2026-07-05T10:00:00.000Z", "commitSha": "ddd4444", "verdict": "pass", "retryFlips": 0 },
+        { "timestamp": "2026-07-06T10:00:00.000Z", "commitSha": "ddd4444", "verdict": "pass", "retryFlips": 0 },
+        { "timestamp": "2026-07-07T10:00:00.000Z", "commitSha": "eee5555", "verdict": "pass", "retryFlips": 0 }
+      ]
     },
     {
       "testId": "shop.spec.ts > login",
@@ -1090,6 +1156,26 @@ const FALLBACK_REPORT = {
     "resolvedRegressions": []
   }
 };
+
+// Companion state artifact written by `flakehound quarantine` — optional.
+const FALLBACK_QUARANTINE = {
+  "version": 1,
+  "quarantined": [
+    {
+      "testId": "shop.spec.ts > checkout",
+      "file": "tests/shop.spec.ts",
+      "quarantinedAt": "2026-07-04T12:00:00.000Z",
+      "flakinessScore": 1,
+      "confidence": "high",
+      "clusterId": "a8a64e2d45ec",
+      "issue": { "number": 1, "url": "https://github.com/mayageva11/flakehound-demo/issues/1" }
+    }
+  ]
+};
+
+/* Mirrors quarantine.stableRunsToRelease (schema default 10) — the state file
+   deliberately doesn't carry config, so the dashboard pins the same default. */
+const STABLE_RUNS_TO_RELEASE = 10;
 
 let currentReport = null;
 
@@ -1168,9 +1254,35 @@ window.downloadJsonReport = function() {
   downloadAnchor.remove();
 };
 
-function render(report, source) {
+/* Trailing streak of clean passes (pass, no retry flips) since quarantinedAt —
+   the client-side mirror of the CLI's isReleasable() release condition. */
+function releaseStreak(signal, entry) {
+  const history = (signal && signal.history) ? signal.history : [];
+  const after = history.filter((h) => Date.parse(h.timestamp) > Date.parse(entry.quarantinedAt));
+  let streak = 0;
+  for (let i = after.length - 1; i >= 0; i--) {
+    if (after[i].verdict === 'pass' && after[i].retryFlips === 0) streak++;
+    else break;
+  }
+  return Math.min(streak, STABLE_RUNS_TO_RELEASE);
+}
+
+window.revealCluster = function(id) {
+  const detailsCard = document.querySelector(`.cluster-card[data-id="${id}"]`);
+  if (!detailsCard) return;
+  detailsCard.open = true;
+  detailsCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  detailsCard.classList.remove('flash-highlight');
+  void detailsCard.offsetWidth; // Reflow reset
+  detailsCard.classList.add('flash-highlight');
+  setTimeout(() => detailsCard.classList.remove('flash-highlight'), 1500);
+};
+
+function render(report, quarantine, source) {
   currentReport = report;
   const { summary, signals, clusters, gate } = report;
+  const qEntries = (quarantine && Array.isArray(quarantine.quarantined)) ? quarantine.quarantined : [];
+  const quarantinedIds = new Set(qEntries.map((q) => q.testId));
   const regressions = signals.filter((s) => s.classification === 'regression');
   const flaky = [...signals.filter((s) => s.classification === 'flaky')]
     .sort((a, b) => b.flakinessScore - a.flakinessScore);
@@ -1300,10 +1412,13 @@ function render(report, source) {
           ${flaky.length === 0
             ? '<div class="empty-state success-style"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>No flaky tests detected</div>'
             : flaky.map((s) => `
-              <div class="card flk signal-card" data-search="${esc(s.testId.toLowerCase())} ${esc(s.confidence.toLowerCase())} ${esc(s.reason ? s.reason.toLowerCase() : '')}">
+              <div class="card flk signal-card" data-search="${esc(s.testId.toLowerCase())} ${esc(s.confidence.toLowerCase())} ${esc(s.reason ? s.reason.toLowerCase() : '')}${quarantinedIds.has(s.testId) ? ' quarantined' : ''}">
                 <div class="card-header">
                   <div class="card-title">${esc(s.testId)}</div>
-                  <span class="chip ${esc(s.confidence)}">${esc(s.confidence)}</span>
+                  <div style="display:flex; gap:6px; align-items:center; flex-shrink:0;">
+                    ${quarantinedIds.has(s.testId) ? '<a class="q-chip" href="#quarantine-section">⊘ quarantined</a>' : ''}
+                    <span class="chip ${esc(s.confidence)}">${esc(s.confidence)}</span>
+                  </div>
                 </div>
                 <div class="score-bar-wrapper">
                   <div class="score-bar-track">
@@ -1347,6 +1462,54 @@ function render(report, source) {
       </details>
     </div>
   `);
+
+  /* 4b. Quarantine panel — only when the state artifact exists and has entries */
+  if (qEntries.length > 0) {
+    parts.push(`
+      <section class="grid-section" id="quarantine-section" style="margin-top: 20px;">
+        <h2 class="section-title">
+          <span class="section-dot purple"></span>
+          Quarantined Tests (${qEntries.length}) — auto-managed by flakehound quarantine
+        </h2>
+        <div>
+          ${qEntries.map((q) => {
+            const sig = signals.find((s) => s.testId === q.testId);
+            const streak = releaseStreak(sig, q);
+            const cells = Array.from({ length: STABLE_RUNS_TO_RELEASE }, (_, i) =>
+              `<span class="rp-cell${i < streak ? ' done' : ''}"></span>`).join('');
+            return `
+              <div class="card qrt">
+                <div class="card-header">
+                  <div class="card-title">⊘ ${esc(q.testId)}</div>
+                  <span class="chip ${esc(q.confidence)}">${esc(q.confidence)}</span>
+                </div>
+                <div class="q-meta">
+                  <span class="q-file">${esc(q.file)}</span>
+                  <span class="q-file">score ${q.flakinessScore.toFixed(2)}</span>
+                  <span class="q-file">since ${esc(day(q.quarantinedAt))}</span>
+                  ${q.clusterId ? `<span class="q-chip" onclick="revealCluster('${esc(q.clusterId)}')">cluster ${esc(q.clusterId)}</span>` : ''}
+                  ${q.issue
+                    ? `<a class="q-issue-link" href="${esc(q.issue.url)}" target="_blank" rel="noopener noreferrer">issue #${q.issue.number} ↗</a>`
+                    : '<span class="q-issue-none">no issue — GITHUB_TOKEN unavailable</span>'}
+                </div>
+                <div class="release-progress">
+                  <span class="rp-label">release progress</span>
+                  <span class="rp-cells">${cells}</span>
+                  <span class="rp-val">${streak}/${STABLE_RUNS_TO_RELEASE} clean passes</span>
+                </div>
+              </div>`;
+          }).join('')}
+        </div>
+        <div class="q-note">
+          Quarantined tests are <strong>not skipped</strong>: they keep running under the
+          <code>@flakehound-quarantined</code> tag in a non-blocking CI lane while the blocking lane
+          excludes them via <code>--grep-invert</code>. After ${STABLE_RUNS_TO_RELEASE} consecutive clean
+          passes flakehound removes the tag, closes the linked issue, and restores the spec file
+          byte-identically.
+        </div>
+      </section>
+    `);
+  }
 
   /* 5. Failure Clusters section */
   const ranked = [...clusters].sort((a, b) =>
@@ -1691,20 +1854,7 @@ function initInteractiveFeatures() {
   const tlRows = document.querySelectorAll('#timeline-rows-container .tl-row');
   tlRows.forEach(row => {
     row.style.cursor = 'pointer';
-    row.addEventListener('click', () => {
-      const id = row.getAttribute('data-id');
-      const detailsCard = document.querySelector(`.cluster-card[data-id="${id}"]`);
-      if (detailsCard) {
-        detailsCard.open = true;
-        detailsCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        detailsCard.classList.remove('flash-highlight');
-        void detailsCard.offsetWidth; // Reflow reset
-        detailsCard.classList.add('flash-highlight');
-        setTimeout(() => {
-          detailsCard.classList.remove('flash-highlight');
-        }, 1500);
-      }
-    });
+    row.addEventListener('click', () => window.revealCluster(row.getAttribute('data-id')));
   });
 
   // Global Keyboard Shortcuts
@@ -1760,11 +1910,18 @@ function donut(sources) {
   `;
 }
 
-// Data fetch logic
-fetch('flakehound.report.json')
-  .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-  .then((report) => render(report, 'flakehound.report.json'))
-  .catch(() => render(FALLBACK_REPORT, 'demo sample'));
+// Data fetch logic — the quarantine state is optional: absence just hides the panel.
+Promise.all([
+  fetch('flakehound.report.json')
+    .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+    .catch(() => null),
+  fetch('flakehound.quarantine.json')
+    .then((r) => (r.ok ? r.json() : null))
+    .catch(() => null),
+]).then(([report, quarantine]) => {
+  if (report) render(report, quarantine, 'flakehound.report.json');
+  else render(FALLBACK_REPORT, FALLBACK_QUARANTINE, 'demo sample');
+});
 </script>
 </body>
 </html>

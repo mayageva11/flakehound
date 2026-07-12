@@ -36,9 +36,16 @@ jobs:
           input-glob: 'tests/fixtures/e2e/*/junit.xml'
           no-ai: 'true'
           fail-on-new-regressions: 'false'
+          quarantine: 'true'
       - name: Assert gate verdict and report shape
         run: |
           test "${{ steps.flakehound.outputs.exit-code }}" = "1" || { echo "expected exit-code 1, got '${{ steps.flakehound.outputs.exit-code }}'"; exit 1; }
+          # The dry-run must set the output either way — and must not have touched the tree.
+          case "${{ steps.flakehound.outputs.quarantine-pending }}" in
+            true|false) ;;
+            *) echo "quarantine-pending not set"; exit 1 ;;
+          esac
+          git diff --exit-code -- tests/ || { echo "quarantine dry-run modified the repo!"; exit 1; }
           node -e "
             const r = require('./${{ steps.flakehound.outputs.report-path }}');
             if (r.version !== 1) throw new Error('bad report version');

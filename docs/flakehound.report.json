@@ -2,11 +2,11 @@
   "version": 1,
   "generatedAt": "2026-07-07T12:22:04.623Z",
   "summary": {
-    "filesParsed": 4,
-    "testRuns": 12,
+    "filesParsed": 7,
+    "testRuns": 15,
     "metadataSources": {
       "sidecar": 0,
-      "dirname": 4,
+      "dirname": 7,
       "mtime": 0
     },
     "testsAnalyzed": 3
@@ -16,8 +16,8 @@
       "testId": "shop.spec.ts > checkout",
       "flakinessScore": 1,
       "classification": "flaky",
-      "confidence": "medium",
-      "reason": "1 pass↔fail transition(s) on the same commit",
+      "confidence": "high",
+      "reason": "1 intra-run retry flip; 1 pass↔fail transition(s) on the same commit",
       "history": [
         {
           "timestamp": "2026-07-01T10:00:00.000Z",
@@ -35,12 +35,30 @@
           "timestamp": "2026-07-03T10:00:00.000Z",
           "commitSha": "bbb2222",
           "verdict": "pass",
-          "retryFlips": 0
+          "retryFlips": 1
         },
         {
           "timestamp": "2026-07-04T10:00:00.000Z",
           "commitSha": "ccc3333",
           "verdict": "fail",
+          "retryFlips": 0
+        },
+        {
+          "timestamp": "2026-07-05T10:00:00.000Z",
+          "commitSha": "ddd4444",
+          "verdict": "pass",
+          "retryFlips": 0
+        },
+        {
+          "timestamp": "2026-07-06T10:00:00.000Z",
+          "commitSha": "ddd4444",
+          "verdict": "pass",
+          "retryFlips": 0
+        },
+        {
+          "timestamp": "2026-07-07T10:00:00.000Z",
+          "commitSha": "eee5555",
+          "verdict": "pass",
           "retryFlips": 0
         }
       ]

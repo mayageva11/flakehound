@@ -28,3 +28,17 @@ jobs:
       - run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  # GitHub Release for the tag — this is what versions the Marketplace listing.
+  # (First-time Marketplace publication is a one-off manual step in the web UI;
+  # after that, each release created here updates the listing automatically.)
+  github-release:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - run: gh release create "$GITHUB_REF_NAME" --generate-notes --verify-tag
+        env:
+          GH_TOKEN: ${{ github.token }}

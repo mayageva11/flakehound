@@ -112,10 +112,15 @@ the verdict, run strips, and clusters:
     input-glob: 'test-results/**/*.xml'
     baseline: flakehound.report.json   # optional
     comment: 'true'                    # PR comment on pull_request events
+    quarantine: 'true'                 # dry-run quarantine report (never edits your repo)
 ```
 
-Outputs: `exit-code` (`0`/`1`/`2`) and `report-path`. Set
-`fail-on-new-regressions: 'false'` to observe without gating.
+Outputs: `exit-code` (`0`/`1`/`2`), `report-path`, and `quarantine-pending`
+(`'true'` when the dry-run found tests to quarantine or release — gate a
+follow-up job on it, or run `npx flakehound quarantine --pr` yourself). Set
+`fail-on-new-regressions: 'false'` to observe without gating. The `quarantine`
+input is strictly read-only reporting: the job summary and PR comment gain a
+"⊘ Quarantine (dry-run)" section, and your repo is never modified.
 
 ### GitHub Actions — raw CLI
 
