@@ -5,1090 +5,484 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>flakehound — CI Test Analysis Report</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
-
   :root {
-    --bg: #07090e;
-    --panel-bg: rgba(15, 23, 42, 0.6);
-    --panel-border: rgba(51, 65, 85, 0.45);
-    --panel-hover: rgba(30, 41, 59, 0.7);
-    --border: rgba(255, 255, 255, 0.06);
-    --border-hover: rgba(255, 255, 255, 0.12);
-    --text: #f8fafc;
-    --text-muted: #94a3b8;
-    --primary: #4f46e5;
-    --primary-light: #6366f1;
-    --success: #10b981;
-    --success-bg: rgba(16, 185, 129, 0.08);
-    --danger: #f43f5e;
-    --danger-bg: rgba(244, 63, 94, 0.08);
-    --warning: #f59e0b;
-    --warning-bg: rgba(245, 158, 11, 0.08);
-    --info: #0ea5e9;
-    --info-bg: rgba(14, 165, 233, 0.08);
-    --mono: 'JetBrains Mono', ui-monospace, monospace;
-    --sans: 'Inter', -apple-system, sans-serif;
+    --bg:      #0d1117;
+    --surface: #161b22;
+    --border:  #30363d;
+    --text:    #e6edf3;
+    --muted:   #7d8590;
+    --accent:  #f97316;
+    --red:     #f85149;
+    --yellow:  #e3b341;
+    --green:   #3fb950;
+    --blue:    #58a6ff;
+    --sans: system-ui, -apple-system, sans-serif;
+    --mono: ui-monospace, 'Cascadia Code', monospace;
   }
 
   * { box-sizing: border-box; }
-  
+
   body {
     margin: 0;
-    background-color: var(--bg);
-    background-image:
-      radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.04) 0px, transparent 50%),
-      radial-gradient(at 50% 0%, rgba(16, 185, 129, 0.01) 0px, transparent 50%),
-      radial-gradient(at 100% 0%, rgba(244, 63, 94, 0.02) 0px, transparent 50%);
+    background: var(--bg);
     color: var(--text);
     font-family: var(--sans);
-    line-height: 1.6;
-    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.5;
     -webkit-font-smoothing: antialiased;
   }
+  .num { font-variant-numeric: tabular-nums; font-weight: 500; }
+  a { color: var(--blue); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  button { font-family: var(--sans); }
 
-  .wrap { max-width: 1120px; margin: 0 auto; padding: 32px 24px 64px; }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 0 20px 48px; }
 
-  /* ── Navigation Header ──────────────────────────────── */
-  .navbar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+  /* ── Header bar ─────────────────────────────────────── */
+  header.topbar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    height: 48px;
+    background: var(--bg);
     border-bottom: 1px solid var(--border);
-    padding: 16px 0;
-    margin-bottom: 24px;
-    flex-wrap: wrap;
-    gap: 16px;
   }
-  .logo-group {
+  .topbar-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+    height: 48px;
     display: flex;
     align-items: center;
-    gap: 12px;
-  }
-  .logo-text {
-    font-family: var(--mono);
-    font-size: 24px;
-    font-weight: 800;
-    letter-spacing: -0.5px;
-    color: var(--text);
-    background: linear-gradient(to right, #818cf8, #a78bfa);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
-  .logo-tag {
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    background: rgba(99, 102, 241, 0.12);
-    color: #818cf8;
-    padding: 3px 8px;
-    border-radius: 6px;
-    border: 1px solid rgba(99, 102, 241, 0.2);
-  }
-  .meta-info {
-    font-size: 13px;
-    color: var(--text-muted);
-    font-family: var(--mono);
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 10px;
-  }
-  .meta-badge {
-    background: var(--panel-bg);
-    border: 1px solid var(--panel-border);
-    padding: 2px 10px;
-    border-radius: 20px;
-    font-size: 12px;
-  }
-
-  /* ── Gate Status Banner ─────────────────────────────── */
-  .gate-banner {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    padding: 16px 20px;
-    border-radius: 12px;
-    margin-bottom: 24px;
-    border: 1px solid;
-    transition: all 0.3s ease;
-    backdrop-filter: blur(8px);
-  }
-  .gate-banner.pass {
-    border-color: rgba(16, 185, 129, 0.35);
-    background: linear-gradient(135deg, rgba(16, 185, 129, 0.06) 0%, rgba(16, 185, 129, 0.01) 100%);
-  }
-  .gate-banner.fail {
-    border-color: rgba(244, 63, 94, 0.35);
-    background: linear-gradient(135deg, rgba(244, 63, 94, 0.06) 0%, rgba(244, 63, 94, 0.01) 100%);
-  }
-  .gate-icon {
-    font-size: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-  .gate-banner.pass .gate-icon {
-    background: rgba(16, 185, 129, 0.15);
-    color: var(--success);
-  }
-  .gate-banner.fail .gate-icon {
-    background: rgba(244, 63, 94, 0.15);
-    color: var(--danger);
-  }
-  .gate-content {
-    flex: 1;
-    display: flex;
-    flex-wrap: wrap;
     justify-content: space-between;
-    align-items: center;
     gap: 12px;
   }
-  .gate-text-group {
-    display: flex;
-    flex-direction: column;
-  }
-  .gate-title {
-    font-size: 15px;
-    font-weight: 700;
-    margin: 0 0 2px 0;
-  }
-  .gate-banner.pass .gate-title { color: var(--success); }
-  .gate-banner.fail .gate-title { color: var(--danger); }
-  .gate-desc {
-    font-size: 12.5px;
-    color: var(--text-muted);
-  }
-  .gate-stats-pills {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-  .gate-pill {
-    font-family: var(--mono);
-    font-size: 11.5px;
-    padding: 3px 10px;
-    border-radius: 6px;
+  .brand { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .wordmark { font-weight: 600; white-space: nowrap; }
+  .wordmark .demo-suffix { color: var(--muted); font-weight: 400; }
+  .tool-link { font-size: 13px; white-space: nowrap; }
+  .topbar-right { display: flex; align-items: center; gap: 12px; }
+  .last-run { color: var(--muted); font-size: 13px; white-space: nowrap; }
+  .btn {
+    background: transparent;
     border: 1px solid var(--border);
-    background: rgba(0, 0, 0, 0.25);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 3px 10px;
+    font-size: 12px;
+    cursor: pointer;
   }
-  .gate-pill.new { border-color: rgba(244, 63, 94, 0.25); color: #fda4af; }
-  .gate-pill.known { border-color: rgba(245, 158, 11, 0.25); color: #fde047; }
-  .gate-pill.resolved { border-color: rgba(16, 185, 129, 0.25); color: #6ee7b7; }
+  .btn:hover { border-color: var(--muted); }
+  .gh-link { display: flex; align-items: center; color: var(--muted); }
+  .gh-link:hover { color: var(--text); }
 
-  /* ── Metric Summary Cards ───────────────────────────── */
-  .stats-grid {
+  /* ── Hero metrics ───────────────────────────────────── */
+  .hero {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 16px;
-    margin-bottom: 28px;
+    gap: 12px;
+    margin: 20px 0 12px;
   }
-  @media (max-width: 900px) {
-    .stats-grid { grid-template-columns: repeat(2, 1fr); }
-  }
-  @media (max-width: 500px) {
-    .stats-grid { grid-template-columns: 1fr; }
-  }
-  .stat-card {
-    background: var(--panel-bg);
-    border: 1px solid var(--panel-border);
-    border-radius: 12px;
-    padding: 16px 20px;
-    transition: all 0.2s ease;
-    backdrop-filter: blur(10px);
-  }
-  .stat-card:hover {
-    transform: translateY(-2px);
-    border-color: var(--border-hover);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-  }
-  .stat-label {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    color: var(--text-muted);
-    margin-bottom: 6px;
-  }
-  .stat-val {
-    font-size: 26px;
-    font-weight: 800;
-    color: var(--text);
-    font-family: var(--mono);
-    line-height: 1;
-  }
-  .stat-sub {
-    font-size: 11px;
-    color: var(--text-muted);
-    margin-top: 6px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  /* ── Controls (Tabs + Search) ───────────────────────── */
-  .toolbar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 16px;
-    margin: 32px 0 20px 0;
-    flex-wrap: wrap;
-  }
-  .tabs {
-    display: flex;
-    background: rgba(0, 0, 0, 0.25);
-    padding: 4px;
-    border-radius: 8px;
+  @media (max-width: 800px) { .hero { grid-template-columns: repeat(2, 1fr); } }
+  .stat {
+    background: var(--surface);
     border: 1px solid var(--border);
-  }
-  .tab-btn {
-    background: transparent;
-    border: none;
-    color: var(--text-muted);
-    padding: 6px 14px;
-    font-size: 13.5px;
-    font-weight: 500;
     border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.2s ease;
+    padding: 16px;
+  }
+  .stat-num { font-size: 32px; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .stat-num.red { color: var(--red); }
+  .stat-num.accent { color: var(--accent); }
+  .stat-label { font-size: 14px; color: var(--muted); margin-top: 4px; }
+
+  /* ── CI gate banner ─────────────────────────────────── */
+  .gate {
     display: flex;
     align-items: center;
-    font-family: var(--sans);
-  }
-  .tab-btn:hover {
-    color: var(--text);
-  }
-  .tab-btn.active {
-    background: rgba(255, 255, 255, 0.08);
-    color: var(--text);
-  }
-  .tab-btn .badge {
-    font-size: 10px;
-    padding: 1px 6px;
-    border-radius: 4px;
-    margin-left: 6px;
-    font-family: var(--mono);
-    font-weight: 600;
-  }
-  .badge-neutral { background: rgba(255, 255, 255, 0.08); color: var(--text-muted); }
-  .badge-red { background: rgba(244, 63, 94, 0.15); color: var(--danger); }
-  .badge-amber { background: rgba(245, 158, 11, 0.15); color: var(--warning); }
-
-  .search-wrapper {
-    position: relative;
-    flex: 1;
-    max-width: 380px;
-    min-width: 240px;
-  }
-  .search-input {
-    width: 100%;
-    background: rgba(0, 0, 0, 0.25);
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    background: var(--surface);
     border: 1px solid var(--border);
-    padding: 8px 12px 8px 36px;
-    color: var(--text);
-    border-radius: 8px;
-    font-size: 13.5px;
-    font-family: var(--sans);
-    transition: all 0.2s ease;
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin-bottom: 12px;
   }
-  .search-input:focus {
-    outline: none;
-    border-color: var(--primary-light);
-    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
-    background: rgba(0, 0, 0, 0.35);
-  }
-  .search-icon {
-    position: absolute;
-    left: 12px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 16px;
-    height: 16px;
-    color: var(--text-muted);
-    pointer-events: none;
-  }
+  .gate.red    { border-left: 4px solid var(--red); }
+  .gate.accent { border-left: 4px solid var(--accent); }
+  .gate.green  { border-left: 4px solid var(--green); }
+  .gate-msg { font-weight: 500; }
+  .gate.red .gate-msg    { color: var(--red); }
+  .gate.accent .gate-msg { color: var(--accent); }
+  .gate.green .gate-msg  { color: var(--green); }
+  .gate-codes { color: var(--muted); font-size: 12px; white-space: nowrap; }
 
-  /* ── Signals Grid ───────────────────────────────────── */
-  .grid {
+  /* ── Main split ─────────────────────────────────────── */
+  .split {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
-    margin-top: 16px;
-    transition: all 0.3s ease;
-  }
-  .grid.full-width {
-    grid-template-columns: 1fr;
-  }
-  .grid-section {
-    background: var(--panel-bg);
-    border: 1px solid var(--panel-border);
-    border-radius: 12px;
-    padding: 20px;
-    backdrop-filter: blur(10px);
-    display: flex;
-    flex-direction: column;
-    height: fit-content;
-    transition: all 0.3s ease;
-  }
-  .grid-section.hidden {
-    display: none;
-  }
-  .section-title {
-    margin: 0 0 16px 0;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    color: var(--text-muted);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .section-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-  }
-  .section-dot.red { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
-  .section-dot.amber { background: var(--warning); box-shadow: 0 0 8px var(--warning); }
-
-  @media (max-width: 820px) {
-    .grid { grid-template-columns: 1fr; }
-  }
-
-  /* ── Test Cards ─────────────────────────────────────── */
-  .card {
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 14px;
-    margin-bottom: 12px;
-    background: rgba(0, 0, 0, 0.15);
-    transition: all 0.2s ease;
-  }
-  .card:hover {
-    border-color: var(--border-hover);
-    background: rgba(0, 0, 0, 0.25);
-  }
-  .card:last-child {
-    margin-bottom: 0;
-  }
-  .card.hidden {
-    display: none !important;
-  }
-  .card.reg { border-left: 3px solid var(--danger); }
-  .card.flk { border-left: 3px solid var(--warning); }
-
-  .card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
+    grid-template-columns: 2fr 3fr;
     gap: 12px;
+    align-items: start;
   }
-  .card-title {
-    font-family: var(--mono);
-    font-size: 13.5px;
-    font-weight: 600;
-    word-break: break-all;
-    color: var(--text);
-  }
-  .card-subtitle {
-    font-size: 11px;
-    color: var(--text-muted);
-    margin-top: 4px;
-    font-family: var(--mono);
-  }
-  .card-subtitle.reg { color: #f43f5e; font-weight: 500; }
-  .card-reason {
-    font-size: 12px;
-    color: var(--text-muted);
-    margin-top: 10px;
-    padding: 6px 10px;
-    background: rgba(0, 0, 0, 0.2);
+  @media (max-width: 900px) { .split { grid-template-columns: 1fr; } }
+  /* grid/flex children default to min-width:auto, letting wide traces blow
+     out the column and the page — force them to shrink and scroll inside */
+  .split > .panel { min-width: 0; }
+  body { overflow-x: clip; }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
     border-radius: 6px;
-    border-left: 2px solid var(--border);
+    padding: 16px;
   }
-
-  .cluster-new-badge {
-    font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: 1px;
-    color: var(--danger); border: 1px solid rgba(244, 63, 94, 0.5); border-radius: 6px;
-    padding: 2px 7px; background: var(--danger-bg); box-shadow: 0 0 8px rgba(244, 63, 94, 0.25);
-  }
-
-  /* ── per-run history timeline (signals[].history) ────── */
-  .run-history { display: flex; align-items: center; gap: 4px; margin-top: 10px; flex-wrap: wrap; }
-  .run-history .rh-label { font-family: var(--mono); font-size: 10px; color: var(--text-muted); letter-spacing: 0.5px; text-transform: uppercase; margin-right: 2px; }
-  .run-history .rh-cell {
-    width: 14px; height: 14px; border-radius: 4px; display: inline-block; position: relative;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-  }
-  .run-history .rh-cell.pass { background: var(--success); box-shadow: 0 0 6px rgba(16, 185, 129, 0.4); }
-  .run-history .rh-cell.fail { background: var(--danger); box-shadow: 0 0 6px rgba(244, 63, 94, 0.4); }
-  .run-history .rh-cell.skip { background: rgba(148, 163, 184, 0.25); }
-  .run-history .rh-cell.flip { outline: 2px solid var(--warning); outline-offset: 1px; }
-
-  /* ── Quarantine panel ───────────────────────────────── */
-  .section-dot.purple { background: #a78bfa; box-shadow: 0 0 8px #a78bfa; }
-  .card.qrt { border-left: 3px solid #a78bfa; }
-  .q-chip {
-    font-family: var(--mono); font-size: 10px; font-weight: 700;
-    color: #a78bfa; border: 1px solid rgba(167, 139, 250, 0.35);
-    background: rgba(167, 139, 250, 0.08); border-radius: 4px; padding: 1px 6px;
-    text-decoration: none; display: inline-block; flex-shrink: 0; cursor: pointer;
-  }
-  .q-chip:hover { background: rgba(167, 139, 250, 0.16); }
-  .q-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; align-items: center; }
-  .q-file {
-    font-family: var(--mono); font-size: 11px; color: var(--text-muted);
-    background: rgba(0, 0, 0, 0.25); border: 1px solid var(--border);
-    border-radius: 4px; padding: 1px 6px;
-  }
-  .q-issue-link {
-    font-family: var(--mono); font-size: 11px; color: #38bdf8;
-    border: 1px solid rgba(14, 165, 233, 0.3); background: rgba(14, 165, 233, 0.06);
-    border-radius: 4px; padding: 1px 6px; text-decoration: none;
-  }
-  .q-issue-link:hover { background: rgba(14, 165, 233, 0.14); }
-  .q-issue-none {
-    font-family: var(--mono); font-size: 11px; color: var(--text-muted);
-    border: 1px dashed var(--border); border-radius: 4px; padding: 1px 6px;
-  }
-  .release-progress { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
-  .release-progress .rp-label {
-    font-family: var(--mono); font-size: 10px; color: var(--text-muted);
-    text-transform: uppercase; letter-spacing: 0.5px;
-  }
-  .release-progress .rp-cells { display: flex; gap: 3px; }
-  .release-progress .rp-cell {
-    width: 12px; height: 12px; border-radius: 3px;
-    border: 1px solid rgba(255, 255, 255, 0.12); background: rgba(0, 0, 0, 0.3);
-  }
-  .release-progress .rp-cell.done { background: var(--success); box-shadow: 0 0 6px rgba(16, 185, 129, 0.4); }
-  .release-progress .rp-val { font-family: var(--mono); font-size: 11px; color: var(--text-muted); }
-  .q-note {
-    margin-top: 14px; padding: 10px 12px; border-radius: 8px;
-    border-left: 3px solid rgba(167, 139, 250, 0.4); background: rgba(167, 139, 250, 0.04);
-    color: var(--text-muted); font-size: 12px; line-height: 1.5;
-  }
-  .q-note code {
-    font-family: var(--mono); color: #a78bfa; background: rgba(167, 139, 250, 0.1);
-    padding: 1px 5px; border-radius: 3px; font-size: 11px;
-  }
-
-  .chip {
-    font-family: var(--mono);
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-    padding: 1px 6px;
-    border-radius: 4px;
-    border: 1px solid;
-    display: inline-block;
-    flex-shrink: 0;
-  }
-  .chip.high { color: var(--success); border-color: rgba(16, 185, 129, 0.3); background: rgba(16, 185, 129, 0.05); }
-  .chip.medium { color: var(--warning); border-color: rgba(245, 158, 11, 0.3); background: rgba(245, 158, 11, 0.05); }
-  .chip.low { color: var(--text-muted); border-color: var(--border); background: rgba(255, 255, 255, 0.03); }
-
-  .score-bar-wrapper {
-    margin-top: 10px;
+  .panel-head {
     display: flex;
     align-items: center;
     gap: 8px;
-  }
-  .score-bar-track {
-    flex: 1;
-    height: 5px;
-    background: rgba(0, 0, 0, 0.3);
-    border-radius: 3px;
-    overflow: hidden;
-  }
-  .score-bar-fill {
-    height: 100%;
-    border-radius: 3px;
-    background: var(--warning);
-  }
-  .score-bar-val {
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--warning);
-    min-width: 32px;
-    text-align: right;
-  }
-
-  /* ── Failure Clusters ───────────────────────────────── */
-  .clusters-section {
-    background: var(--panel-bg);
-    border: 1px solid var(--panel-border);
-    border-radius: 12px;
-    padding: 20px;
-    margin-top: 24px;
-    backdrop-filter: blur(10px);
-  }
-  .cluster-list {
-    margin-top: 16px;
-  }
-  details.cluster-card {
-    border: 1px solid var(--border);
-    border-radius: 8px;
     margin-bottom: 12px;
-    background: rgba(0, 0, 0, 0.15);
-    overflow: hidden;
-    transition: all 0.2s ease;
-  }
-  details.cluster-card.hidden {
-    display: none !important;
-  }
-  details.cluster-card:hover {
-    border-color: var(--border-hover);
-  }
-  details.cluster-card[open] {
-    border-color: rgba(99, 102, 241, 0.35);
-    background: rgba(0, 0, 0, 0.25);
-  }
-  @keyframes flash {
-    0% { background: rgba(99, 102, 241, 0.45); border-color: var(--primary-light); }
-    100% { background: rgba(0, 0, 0, 0.15); border-color: var(--border); }
-  }
-  .flash-highlight {
-    animation: flash 1.5s ease-out;
-  }
-  details.cluster-card summary {
-    list-style: none;
-    cursor: pointer;
-    padding: 14px 16px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    user-select: none;
     flex-wrap: wrap;
   }
-  details.cluster-card summary::-webkit-details-marker {
-    display: none;
+  .panel-title { font-size: 14px; font-weight: 600; margin: 0; }
+  .count-badge {
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0 7px;
+    color: var(--muted);
   }
-  .summary-caret {
-    width: 14px;
-    height: 14px;
-    color: var(--text-muted);
-    transition: transform 0.2s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
+  .panel-hint { font-size: 12px; color: var(--muted); }
+  .filter-results { font-size: 12px; color: var(--accent); }
+
+  .filter-input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 6px 10px;
+    font-size: 13px;
+    margin-bottom: 12px;
   }
-  details.cluster-card[open] summary .summary-caret {
-    transform: rotate(90deg);
+  .filter-input:focus { outline: none; border-color: var(--blue); }
+  .filter-input::placeholder { color: var(--muted); }
+
+  /* ── Signal rows ────────────────────────────────────── */
+  .sig-row {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    background: var(--bg);
   }
-  .cluster-rank {
+  .sig-row:hover { border-color: var(--muted); }
+  .sig-row:last-child { margin-bottom: 0; }
+  .sig-row.hidden { display: none; }
+  .sig-main { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .sig-name {
     font-family: var(--mono);
-    color: var(--text-muted);
-    font-size: 11.5px;
-    font-weight: 600;
-    background: rgba(255, 255, 255, 0.05);
-    padding: 1px 6px;
-    border-radius: 4px;
-  }
-  .cluster-head {
-    font-family: var(--mono);
-    font-size: 13.5px;
-    font-weight: 600;
+    font-size: 12.5px;
     flex: 1;
-    white-space: nowrap;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
-    color: var(--text);
-    min-width: 200px;
+    white-space: nowrap;
   }
-  .cluster-badge {
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--danger);
-    background: rgba(244, 63, 94, 0.08);
-    border: 1px solid rgba(244, 63, 94, 0.18);
+  .badge {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.4px;
     border-radius: 6px;
-    padding: 1px 8px;
-    white-space: nowrap;
-  }
-  .cluster-id-badge {
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--text-muted);
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid var(--border);
-    border-radius: 4px;
     padding: 1px 6px;
-    white-space: nowrap;
+    flex-shrink: 0;
   }
-
-  .cluster-body {
-    padding: 0 16px 16px 16px;
-    border-top: 1px dashed var(--border);
-    margin-top: 0;
+  .badge.reg { background: var(--red); color: #0d1117; }
+  .badge.flk { background: var(--accent); color: #0d1117; }
+  .badge.stb { background: var(--border); color: var(--muted); }
+  .score-track {
+    width: 72px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    flex-shrink: 0;
+    overflow: hidden;
   }
-  .hypothesis-box {
-    margin: 14px 0;
-    padding: 12px 14px;
-    background: rgba(14, 165, 233, 0.04);
-    border-left: 3px solid var(--info);
-    border-radius: 0 8px 8px 0;
-    font-size: 13px;
-    line-height: 1.5;
-  }
-  .hypothesis-header {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: 4px;
-    flex-wrap: wrap;
-  }
-  .hypothesis-ai-label {
-    font-size: 9px;
-    font-family: var(--mono);
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    background: rgba(14, 165, 233, 0.12);
-    color: #38bdf8;
-    padding: 1px 5px;
-    border-radius: 3px;
-  }
-  .hypothesis-cat {
-    font-size: 9.5px;
-    font-family: var(--mono);
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    border: 1px solid rgba(14, 165, 233, 0.25);
-    color: var(--info);
-    padding: 1px 5px;
-    border-radius: 3px;
-  }
-  .hypothesis-exp {
-    color: #e2e8f0;
-  }
-
-  .trace-container {
-    position: relative;
-    margin: 12px 0;
-  }
-  pre.trace-block {
-    margin: 0;
-    padding: 14px;
-    border-radius: 8px;
-    overflow-x: auto;
-    background: #030508;
+  .score-fill { height: 100%; border-radius: 2px; }
+  .sig-chips { display: flex; align-items: center; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .chip {
+    font-size: 11px;
     border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0 6px;
+    color: var(--muted);
+  }
+  .chip.mono { font-family: var(--mono); }
+  .chip.conf-high   { color: var(--green);  border-color: var(--green); }
+  .chip.conf-medium { color: var(--yellow); border-color: var(--yellow); }
+  .chip.q-chip { color: var(--blue); border-color: var(--blue); cursor: pointer; }
+  .chip.q-chip:hover { background: var(--bg); }
+
+  .sig-timeline { display: none; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .sig-row.expanded .sig-timeline { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .dot-wrap { position: relative; display: inline-flex; align-items: center; }
+  .dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    display: inline-block;
+  }
+  .dot.pass { background: var(--green); }
+  .dot.fail { background: var(--red); }
+  .dot.skip { background: var(--muted); }
+  .dot-flip { font-size: 9px; line-height: 1; margin-left: 1px; }
+  .sig-reason { font-size: 12px; color: var(--muted); margin-top: 8px; }
+
+  /* ── Cluster cards ──────────────────────────────────── */
+  .cluster-card {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 12px;
+    background: var(--bg);
+  }
+  .cluster-card:last-child { margin-bottom: 0; }
+  .cluster-card.hidden { display: none; }
+  @keyframes flash {
+    0%   { border-color: var(--blue); background: #101a2c; }
+    100% { border-color: var(--border); background: var(--bg); }
+  }
+  .cluster-card.flash-highlight { animation: flash 1.5s ease-out; }
+  .cluster-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .id-chip {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--blue);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1px 7px;
+    cursor: pointer;
+  }
+  .id-chip:hover { border-color: var(--blue); }
+  .c-meta { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .c-hypo { font-style: italic; color: var(--muted); font-size: 12.5px; margin-top: 8px; cursor: help; }
+  pre.c-trace {
+    margin: 8px 0 0;
+    padding: 10px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
     font-family: var(--mono);
     font-size: 12px;
     line-height: 1.55;
-    color: #cbd5e1;
+    color: var(--text);
+    overflow-x: auto;
+    white-space: pre;
   }
-  pre.trace-block::-webkit-scrollbar {
-    height: 8px;
-  }
-  pre.trace-block::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  pre.trace-block::-webkit-scrollbar-thumb {
-    background: var(--border);
-    border-radius: 4px;
-  }
-  pre.trace-block::-webkit-scrollbar-thumb:hover {
-    background: var(--border-hover);
+  pre.c-trace.clamped { max-height: calc(6 * 1.55 * 12px + 20px); overflow: hidden; }
+  pre.c-trace .ph { color: var(--yellow); }
+  pre.c-trace .errcls { color: var(--red); font-weight: 600; }
+  .trace-toggle {
+    background: transparent; border: none; color: var(--blue);
+    font-size: 12px; cursor: pointer; padding: 4px 0 0;
   }
 
-  pre.trace-block .ph { color: #f472b6; background: rgba(244, 114, 182, 0.08); border-radius: 3px; padding: 0 2px; }
-  pre.trace-block .errcls { color: #f43f5e; font-weight: 700; }
-
-  .copy-btn {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    background: rgba(255, 255, 255, 0.04);
+  /* ── Quarantine panel ───────────────────────────────── */
+  .full-panel { margin-top: 12px; }
+  .panel-sub { font-size: 13px; color: var(--muted); margin: -8px 0 12px; }
+  .q-card {
     border: 1px solid var(--border);
-    color: var(--text-muted);
-    font-family: var(--sans);
-    font-size: 11px;
-    padding: 4px 8px;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: all 0.2s ease;
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 12px;
+    background: var(--bg);
+  }
+  .q-card:last-child { margin-bottom: 0; }
+  .q-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .q-name { font-family: var(--mono); font-size: 12.5px; flex: 1; min-width: 0; }
+  .q-meta { display: flex; align-items: center; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .rp { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .rp-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+  .rp-cells { display: flex; gap: 3px; }
+  .rp-cell { width: 12px; height: 12px; border-radius: 3px; border: 1px solid var(--border); background: var(--surface); }
+  .rp-cell.done { background: var(--green); border-color: var(--green); }
+  .rp-val { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .q-note { font-size: 12.5px; color: var(--muted); margin-top: 12px; line-height: 1.5; }
+  .q-note code {
+    font-family: var(--mono); font-size: 11.5px;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 3px; padding: 0 4px;
+  }
+
+  /* ── Story arc (demo only) ──────────────────────────── */
+  .arc-track {
     display: flex;
-    align-items: center;
-    gap: 4px;
+    align-items: stretch;
+    gap: 0;
+    overflow-x: auto;
+    padding: 8px 0 4px;
+  }
+  .arc-event { flex: 1; min-width: 150px; position: relative; padding: 0 12px 0 0; }
+  .arc-event::before {
+    content: '';
+    position: absolute;
+    top: 5px; left: 14px; right: 0;
+    height: 2px;
+    background: var(--border);
+  }
+  .arc-event:last-child::before { display: none; }
+  .arc-dot {
+    position: relative;
+    width: 12px; height: 12px; border-radius: 50%;
+    border: 2px solid var(--border);
+    background: var(--surface);
+    margin-bottom: 8px;
+  }
+  .arc-dot.red    { border-color: var(--red);    background: var(--red); }
+  .arc-dot.accent { border-color: var(--accent); background: var(--accent); }
+  .arc-dot.green  { border-color: var(--green);  background: var(--green); }
+  .arc-dot.blue   { border-color: var(--blue);   background: var(--blue); }
+  .arc-dot.hollow { background: var(--surface); }
+  .arc-when { font-size: 11px; color: var(--muted); }
+  .arc-title { font-size: 13px; font-weight: 600; margin: 2px 0; }
+  .arc-desc { font-size: 12px; color: var(--muted); line-height: 1.4; }
+
+  /* ── How it works ───────────────────────────────────── */
+  details.how { margin-top: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
+  details.how summary {
+    cursor: pointer;
+    padding: 12px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    list-style: none;
     user-select: none;
   }
-  .copy-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: var(--text);
-    border-color: var(--border-hover);
+  details.how summary::-webkit-details-marker { display: none; }
+  details.how summary::before { content: '▸ '; color: var(--muted); }
+  details.how[open] summary::before { content: '▾ '; }
+  .how-body { padding: 0 16px 16px; }
+  .how-step { display: flex; gap: 12px; margin-bottom: 14px; }
+  .how-num {
+    width: 22px; height: 22px; flex-shrink: 0;
+    border: 1px solid var(--border); border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums;
   }
-  .copy-btn.copied {
-    background: var(--success-bg);
-    color: var(--success);
-    border-color: rgba(16, 185, 129, 0.25);
+  .how-title { font-weight: 600; font-size: 13.5px; }
+  .how-desc { font-size: 13px; color: var(--muted); }
+  .how-desc code, .how-title code {
+    font-family: var(--mono); font-size: 12px;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 3px; padding: 0 4px;
   }
+  .how-note { font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--border); padding-top: 12px; }
 
-  .affected-tests {
-    margin-top: 12px;
-    font-size: 12px;
-    color: var(--text-muted);
-  }
-  .affected-tests code {
-    font-family: var(--mono);
-    color: #e2e8f0;
-    background: rgba(0, 0, 0, 0.2);
-    padding: 2px 6px;
-    border-radius: 4px;
-    margin: 2px;
-    display: inline-block;
-  }
-  .affected-range {
-    margin-top: 4px;
-    font-size: 11px;
-    color: var(--text-muted);
-    font-family: var(--mono);
-  }
-
-  /* ── Timeline Section ───────────────────────────────── */
-  .timeline-section {
-    background: var(--panel-bg);
-    border: 1px solid var(--panel-border);
-    border-radius: 12px;
-    padding: 20px;
-    margin-top: 24px;
-    backdrop-filter: blur(10px);
-  }
-  .tl-row {
-    display: grid;
-    grid-template-columns: 200px 1fr;
-    gap: 16px;
-    align-items: center;
-    margin-bottom: 10px;
-  }
-  .tl-row.hidden {
-    display: none !important;
-  }
-  .tl-label {
-    font-family: var(--mono);
-    font-size: 12px;
-    color: var(--text-muted);
-    text-align: right;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .tl-track {
-    position: relative;
-    height: 10px;
-    background: rgba(0, 0, 0, 0.3);
-    border-radius: 6px;
-    border: 1px solid var(--border);
-  }
-  .tl-bar {
-    position: absolute;
-    top: 1px;
-    bottom: 1px;
-    border-radius: 4px;
-    background: linear-gradient(90deg, #6366f1, #3b82f6);
-  }
-  .tl-axis {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 8px;
-    margin-left: 216px;
-    color: var(--text-muted);
-    font-family: var(--mono);
-    font-size: 11px;
-  }
-
-  /* ── Bottom Grid (Donut + Details) ──────────────────── */
-  .bottom-grid {
-    display: grid;
-    grid-template-columns: 320px 1fr;
-    gap: 20px;
-    margin-top: 24px;
-  }
-  @media (max-width: 820px) {
-    .bottom-grid { grid-template-columns: 1fr; }
-  }
-  .donut-container {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    margin-top: 12px;
-  }
-  .legend-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    font-size: 12.5px;
-  }
-  .legend-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: var(--text-muted);
-  }
-  .legend-color {
-    width: 10px;
-    height: 10px;
-    border-radius: 3px;
-    display: inline-block;
-  }
-  .legend-item b {
-    color: var(--text);
-    font-family: var(--mono);
-    font-weight: 600;
-  }
-
-  .gate-detail-rows {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin-top: 12px;
-  }
-  .gate-detail-row {
-    display: flex;
-    gap: 12px;
-    align-items: baseline;
-    font-size: 13px;
-  }
-  .gate-detail-key {
-    font-family: var(--mono);
-    font-size: 11.5px;
-    font-weight: 600;
-    text-transform: uppercase;
-    min-width: 90px;
-  }
-  .gate-detail-key.new { color: var(--danger); }
-  .gate-detail-key.known { color: var(--warning); }
-  .gate-detail-key.res { color: var(--success); }
-  .gate-detail-val {
-    color: var(--text-muted);
-    font-family: var(--mono);
-    font-size: 12.5px;
-    word-break: break-all;
-  }
-
-  /* ── How it works Stepper ───────────────────────────── */
-  .stepper-section {
-    background: var(--panel-bg);
-    border: 1px solid var(--panel-border);
-    border-radius: 12px;
-    padding: 20px;
-    margin-top: 24px;
-    backdrop-filter: blur(10px);
-  }
-  .stepper {
-    margin: 16px 0 0 0;
-    padding: 0;
-    list-style: none;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-  }
-  .step-item {
-    display: flex;
-    gap: 16px;
-  }
-  .step-num {
-    width: 26px;
-    height: 26px;
-    background: rgba(99, 102, 241, 0.12);
-    color: #818cf8;
-    border: 1px solid rgba(99, 102, 241, 0.25);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 12.5px;
-    font-weight: 700;
-    font-family: var(--mono);
-    flex-shrink: 0;
-    margin-top: 2px;
-  }
-  .step-content {
-    flex: 1;
-  }
-  .step-title {
-    font-size: 14.5px;
-    font-weight: 700;
-    color: var(--text);
-    margin-bottom: 4px;
-  }
-  .step-title code {
-    font-family: var(--mono);
-    color: var(--info);
-    background: rgba(14, 165, 233, 0.1);
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-size: 12.5px;
-  }
-  .step-desc {
-    font-size: 13px;
-    color: var(--text-muted);
-    line-height: 1.5;
-  }
-  .step-desc em {
-    font-style: italic;
-  }
-  .stepper-info-box {
-    margin-top: 20px;
-    padding: 14px;
-    border-radius: 8px;
-    border-left: 3px solid var(--border);
-    background: rgba(255, 255, 255, 0.02);
-    color: var(--text-muted);
-    font-size: 12.5px;
-    line-height: 1.5;
-  }
-  .stepper-info-box em {
-    font-style: italic;
-    color: var(--text);
-  }
-
-  /* ── Empty & Error States ───────────────────────────── */
-  .empty-state {
-    text-align: center;
-    padding: 32px 20px;
-    color: var(--text-muted);
-    font-size: 13.5px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0, 0, 0, 0.05);
+  /* ── Empty states / footer ──────────────────────────── */
+  .empty {
     border: 1px dashed var(--border);
-    border-radius: 8px;
-    margin-top: 8px;
-  }
-  .empty-state.hidden {
-    display: none !important;
-  }
-  .empty-state.success-style {
-    color: var(--success);
-    background: rgba(16, 185, 129, 0.02);
-    border-color: rgba(16, 185, 129, 0.2);
-  }
-  .empty-state svg {
-    margin-bottom: 8px;
-    width: 20px;
-    height: 20px;
-    color: currentColor;
-    opacity: 0.8;
-  }
-
-  footer {
-    margin-top: 48px;
+    border-radius: 6px;
+    padding: 20px;
     text-align: center;
-    color: var(--text-muted);
-    font-size: 12.5px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .empty.hidden { display: none; }
+  footer {
+    margin-top: 32px;
+    padding-top: 16px;
     border-top: 1px solid var(--border);
-    padding-top: 24px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 12.5px;
   }
-  footer a {
-    color: var(--primary-light);
-    text-decoration: none;
-    transition: color 0.2s ease;
-  }
-  footer a:hover {
-    color: var(--text);
-    text-decoration: underline;
-  }
+  footer code { font-family: var(--mono); font-size: 11.5px; }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <!-- Navbar Header -->
-  <header class="navbar">
-    <div class="logo-group">
-      <span class="logo-text">flakehound</span>
-      <span class="logo-tag">CI Test Report</span>
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand" id="brand">
+      <span class="wordmark">🐕 flakehound</span>
     </div>
-    <div style="display: flex; align-items: center; gap: 16px;">
-      <div class="meta-info" id="meta"></div>
-      <button class="copy-btn" id="download-json-btn" onclick="downloadJsonReport()" style="position: static; margin-top: 0; height: 28px; background: rgba(99,102,241,0.12); color: #818cf8; border-color: rgba(99,102,241,0.25);">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:4px; vertical-align:middle;">
-          <path d="M21 15v4a2 2 0 0 1-2-2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
-        </svg> Export JSON
-      </button>
+    <div class="topbar-right">
+      <span class="last-run" id="last-run"></span>
+      <button class="btn" onclick="downloadJsonReport()">Export JSON</button>
+      <a class="gh-link" href="https://github.com/mayageva11/flakehound" target="_blank" rel="noopener noreferrer" aria-label="GitHub repository">
+        <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+          <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+        </svg>
+      </a>
     </div>
-  </header>
+  </div>
+</header>
 
-  <!-- CI Gate and Dashboard App -->
+<div class="wrap">
   <div id="app"></div>
 
-  <!-- How this works stepper -->
-  <section class="stepper-section">
-    <h2 class="section-title">
-      <svg style="width: 14px; height: 14px; vertical-align: middle; fill: currentColor; margin-right: 4px;" viewBox="0 0 24 24">
-        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
-      </svg>
-      How this works — A four-stage analysis chain
-    </h2>
-    <ol class="stepper">
-      <li class="step-item">
-        <div class="step-num">1</div>
-        <div class="step-content">
-          <div class="step-title">Test Suite Executed in CI</div>
-          <div class="step-desc">
-            Each run produces standard JUnit XML alongside a small metadata sidecar (commit SHA, timestamp, runner platform). These runs accumulate into a history database that serves as the raw input.
-          </div>
+  <details class="how">
+    <summary>How it works — a four-stage analysis chain</summary>
+    <div class="how-body">
+      <div class="how-step">
+        <div class="how-num">1</div>
+        <div>
+          <div class="how-title">Test suite executed in CI</div>
+          <div class="how-desc">Each run produces standard JUnit XML alongside a small metadata sidecar (commit SHA, timestamp, runner platform). These runs accumulate into a history database that serves as the raw input.</div>
         </div>
-      </li>
-      <li class="step-item">
-        <div class="step-num">2</div>
-        <div class="step-content">
-          <div class="step-title">Analysis by the <code>flakehound</code> CLI</div>
-          <div class="step-desc">
-            Flakiness is scored by pass↔fail <em>transition frequency on the exact same commit</em> (not naive fail rates). Tests failing 100% since a specific commit are isolated as regressions. Failures are clustered by a <em>normalized stack trace</em> (volatile tokens like line numbers, memory addresses, and durations are stripped while identity tokens are preserved). AI layers can optionally generate root-cause hypotheses.
-          </div>
+      </div>
+      <div class="how-step">
+        <div class="how-num">2</div>
+        <div>
+          <div class="how-title">Analysis by the <code>flakehound</code> CLI</div>
+          <div class="how-desc">Flakiness is scored by pass↔fail <em>transition frequency on the exact same commit</em> (not naive fail rates). Tests failing 100% since a specific commit are isolated as regressions. Failures are clustered by a <em>normalized stack trace</em> (volatile tokens like line numbers, memory addresses, and durations are stripped while identity tokens are preserved). AI layers can optionally generate root-cause hypotheses.</div>
         </div>
-      </li>
-      <li class="step-item">
-        <div class="step-num">3</div>
-        <div class="step-content">
-          <div class="step-title">Dashboard View Layer</div>
-          <div class="step-desc">
-            The CLI outputs <code>flakehound.report.json</code>. This dashboard consumes the JSON artifact and structures the metrics, signal tabs, clusters, and timeline views shown above.
-          </div>
+      </div>
+      <div class="how-step">
+        <div class="how-num">3</div>
+        <div>
+          <div class="how-title">Dashboard view layer</div>
+          <div class="how-desc">The CLI outputs <code>flakehound.report.json</code>. This dashboard consumes the JSON artifact and structures the metrics, signals, clusters, and quarantine views shown above.</div>
         </div>
-      </li>
-      <li class="step-item">
-        <div class="step-num">4</div>
-        <div class="step-content">
-          <div class="step-title">Quarantine &amp; Auto-Release via <code>flakehound quarantine</code></div>
-          <div class="step-desc">
-            High-confidence flaky tests are tagged <code>@flakehound-quarantined</code> in their spec files with a surgical AST edit, and a GitHub issue is filed per test. The blocking CI lane excludes the tag while a non-blocking lane keeps running the tests — so once a test posts enough consecutive clean passes, flakehound removes the tag, closes the issue, and restores the file byte-identically. Nothing is ever skipped into oblivion.
-          </div>
+      </div>
+      <div class="how-step">
+        <div class="how-num">4</div>
+        <div>
+          <div class="how-title">Quarantine &amp; auto-release via <code>flakehound quarantine</code></div>
+          <div class="how-desc">High-confidence flaky tests are tagged <code>@flakehound-quarantined</code> in their spec files with a surgical AST edit, and a GitHub issue is filed per test. The blocking CI lane excludes the tag while a non-blocking lane keeps running the tests — so once a test posts enough consecutive clean passes, flakehound removes the tag, closes the issue, and restores the file byte-identically. Nothing is ever skipped into oblivion.</div>
         </div>
-      </li>
-    </ol>
-    <div class="stepper-info-box">
-      <strong>Note:</strong> Flakehound works strictly on <em>test metadata</em> (JUnit XML) and does not inspect your running codebase. AI hypothesis generations are interpretive additions and do not alter the core deterministic scores, clusters, or CI gate verdicts.
+      </div>
+      <div class="how-note"><strong>Note:</strong> flakehound works strictly on <em>test metadata</em> (JUnit XML) and does not inspect your running codebase. AI hypothesis generations are interpretive additions and do not alter the core deterministic scores, clusters, or CI gate verdicts.</div>
     </div>
-  </section>
+  </details>
 
-  <footer>
+  <footer id="footer">
     Generated from <code>flakehound.report.json</code> ·
     <a href="https://github.com/mayageva11/flakehound" target="_blank" rel="noopener noreferrer">github.com/mayageva11/flakehound</a>
   </footer>
 </div>
 
 <script>
-// Mock data block used if file is loaded directly via file://
+/* ── Config: injected by CI as window.FHCONFIG, URL params as fallback ── */
+const FH = (() => {
+  if (window.FHCONFIG) return window.FHCONFIG;
+  const p = new URLSearchParams(location.search);
+  const n = Number(p.get('stableRuns'));
+  return {
+    stableRuns: Number.isFinite(n) && n > 0 ? n : undefined,
+    mode: p.get('mode') ?? undefined,
+  };
+})();
+const STABLE_RUNS_TO_RELEASE = FH.stableRuns ?? 10;
+const DEMO_MODE = FH.mode === 'demo';
+
+/* Mock data block used if file is loaded directly via file:// */
 const FALLBACK_REPORT = {
   "version": 1,
-  "generatedAt": "2026-07-06T07:59:22.945Z",
+  "generatedAt": "2026-07-07T12:22:04.623Z",
   "summary": {
-    "filesParsed": 4,
-    "testRuns": 12,
-    "metadataSources": { "sidecar": 0, "dirname": 4, "mtime": 0 },
+    "filesParsed": 7,
+    "testRuns": 15,
+    "metadataSources": { "sidecar": 0, "dirname": 7, "mtime": 0 },
     "testsAnalyzed": 3
   },
   "signals": [
@@ -1112,7 +506,13 @@ const FALLBACK_REPORT = {
       "testId": "shop.spec.ts > login",
       "flakinessScore": 0,
       "classification": "stable",
-      "confidence": "high"
+      "confidence": "high",
+      "history": [
+        { "timestamp": "2026-07-01T10:00:00.000Z", "commitSha": "aaa1111", "verdict": "pass", "retryFlips": 0 },
+        { "timestamp": "2026-07-02T10:00:00.000Z", "commitSha": "bbb2222", "verdict": "pass", "retryFlips": 0 },
+        { "timestamp": "2026-07-03T10:00:00.000Z", "commitSha": "bbb2222", "verdict": "pass", "retryFlips": 0 },
+        { "timestamp": "2026-07-04T10:00:00.000Z", "commitSha": "ccc3333", "verdict": "pass", "retryFlips": 0 }
+      ]
     },
     {
       "testId": "shop.spec.ts > payment",
@@ -1120,7 +520,13 @@ const FALLBACK_REPORT = {
       "classification": "regression",
       "confidence": "high",
       "reason": "failing in 100% of the last 3 run(s) since commit bbb2222; passed before it",
-      "brokenSinceSha": "bbb2222"
+      "brokenSinceSha": "bbb2222",
+      "history": [
+        { "timestamp": "2026-07-01T10:00:00.000Z", "commitSha": "aaa1111", "verdict": "pass", "retryFlips": 0 },
+        { "timestamp": "2026-07-02T10:00:00.000Z", "commitSha": "bbb2222", "verdict": "fail", "retryFlips": 0 },
+        { "timestamp": "2026-07-03T10:00:00.000Z", "commitSha": "bbb2222", "verdict": "fail", "retryFlips": 0 },
+        { "timestamp": "2026-07-04T10:00:00.000Z", "commitSha": "ccc3333", "verdict": "fail", "retryFlips": 0 }
+      ]
     }
   ],
   "clusters": [
@@ -1133,7 +539,7 @@ const FALLBACK_REPORT = {
       "occurrences": 3,
       "hypothesis": {
         "category": "assertion",
-        "explanation": "Cart total and charged amount diverge consistently, pointing at a real pricing defect rather than test noise."
+        "explanation": "The test is verifying a specific assertion about the cart total, suggesting that the failure might be due to an incorrect implementation or data issue."
       }
     },
     {
@@ -1144,8 +550,8 @@ const FALLBACK_REPORT = {
       "lastSeen": "2026-07-04T10:00:00.000Z",
       "occurrences": 2,
       "hypothesis": {
-        "category": "timeout",
-        "explanation": "The #pay-button locator intermittently never renders within the wait budget — a slow payment widget under CI load."
+        "category": "race-condition",
+        "explanation": "Multiple test runs happened concurrently, causing the 'pay-button' locator to be locked by another test while waiting for it to be available."
       }
     }
   ],
@@ -1153,7 +559,9 @@ const FALLBACK_REPORT = {
     "baselineUsed": false,
     "newRegressions": ["shop.spec.ts > payment"],
     "knownRegressions": [],
-    "resolvedRegressions": []
+    "resolvedRegressions": [],
+    "newClusters": ["7a7c11808d52", "a8a64e2d45ec"],
+    "knownClusters": []
   }
 };
 
@@ -1173,37 +581,31 @@ const FALLBACK_QUARANTINE = {
   ]
 };
 
-/* Mirrors quarantine.stableRunsToRelease (schema default 10) — the state file
-   deliberately doesn't carry config, so the dashboard pins the same default. */
-const STABLE_RUNS_TO_RELEASE = 10;
-
 let currentReport = null;
 
-const CATEGORY_COLORS = {
-  'race-condition': '#f43f5e',
-  'timeout': '#f59e0b',
-  'network': '#3b82f6',
-  'environment': '#8b5cf6',
-  'assertion': '#0ea5e9'
-};
-
+/* ── Helpers ─────────────────────────────────────────── */
 const esc = (s) => String(s)
   .replaceAll('&', '&amp;').replaceAll('<', '&lt;')
   .replaceAll('>', '&gt;').replaceAll('"', '&quot;');
 
 const day = (iso) => iso.slice(0, 10);
 
-/* Per-run pass/fail timeline from signals[].history: green pass, red fail,
-   amber outline = intra-run retry flip. Empty when the report predates history. */
-function runHistory(signal) {
-  const history = signal.history ?? [];
-  if (history.length === 0) return '';
-  const cells = history.map((h) => {
-    const flip = h.retryFlips > 0 ? ' flip' : '';
-    const title = `${day(h.timestamp)} · ${h.commitSha ? h.commitSha.slice(0, 7) : 'no sha'} · ${h.verdict}${h.retryFlips > 0 ? ' (retry flip)' : ''}`;
-    return `<span class="rh-cell ${h.verdict}${flip}" title="${esc(title)}"></span>`;
-  });
-  return `<div class="run-history"><span class="rh-label">runs</span>${cells.join('')}</div>`;
+function relTime(iso) {
+  const diff = Date.now() - Date.parse(iso);
+  if (!Number.isFinite(diff)) return '';
+  const s = Math.floor(diff / 1000);
+  if (s < 60) return 'just now';
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return `${d}d ago`;
+}
+
+function headOf(trace) {
+  const head = trace.split(' at ')[0].trim();
+  return head.length > 72 ? head.slice(0, 72) + '…' : head;
 }
 
 function renderTrace(trace) {
@@ -1214,45 +616,6 @@ function renderTrace(trace) {
     '<span class="errcls">$1</span>');
   return html;
 }
-
-window.copyClusterTrace = function(clusterId, btnId) {
-  const btn = document.getElementById(btnId);
-  if (!btn) return;
-  const cluster = currentReport && currentReport.clusters.find(c => c.id === clusterId);
-  const text = cluster ? cluster.representativeTrace : '';
-  if (!text) return;
-  navigator.clipboard.writeText(text).then(() => {
-    const origHtml = btn.innerHTML;
-    btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:2px; vertical-align:middle;"><path d="M20 6L9 17l-5-5"/></svg> Copied!`;
-    btn.classList.add('copied');
-    setTimeout(() => {
-      btn.innerHTML = origHtml;
-      btn.classList.remove('copied');
-    }, 2000);
-  }).catch(err => {
-    console.error('Failed to copy text: ', err);
-  });
-};
-
-window.toggleAllClusters = function(open) {
-  const details = document.querySelectorAll('#cluster-list-container .cluster-card');
-  details.forEach(d => {
-    if (!d.classList.contains('hidden')) {
-      d.open = open;
-    }
-  });
-};
-
-window.downloadJsonReport = function() {
-  if (!currentReport) return;
-  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(currentReport, null, 2));
-  const downloadAnchor = document.createElement('a');
-  downloadAnchor.setAttribute("href",     dataStr);
-  downloadAnchor.setAttribute("download", "flakehound.report.json");
-  document.body.appendChild(downloadAnchor);
-  downloadAnchor.click();
-  downloadAnchor.remove();
-};
 
 /* Trailing streak of clean passes (pass, no retry flips) since quarantinedAt —
    the client-side mirror of the CLI's isReleasable() release condition. */
@@ -1267,239 +630,309 @@ function releaseStreak(signal, entry) {
   return Math.min(streak, STABLE_RUNS_TO_RELEASE);
 }
 
-window.revealCluster = function(id) {
-  const detailsCard = document.querySelector(`.cluster-card[data-id="${id}"]`);
-  if (!detailsCard) return;
-  detailsCard.open = true;
-  detailsCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  detailsCard.classList.remove('flash-highlight');
-  void detailsCard.offsetWidth; // Reflow reset
-  detailsCard.classList.add('flash-highlight');
-  setTimeout(() => detailsCard.classList.remove('flash-highlight'), 1500);
+window.revealCluster = function (id) {
+  const card = document.getElementById(`cluster-${id}`);
+  if (!card) return;
+  card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  card.classList.remove('flash-highlight');
+  void card.offsetWidth; // reflow so the animation restarts
+  card.classList.add('flash-highlight');
+  setTimeout(() => card.classList.remove('flash-highlight'), 1500);
 };
 
+window.scrollToQuarantine = function (idx, ev) {
+  ev.stopPropagation();
+  const card = document.getElementById(`q-card-${idx}`);
+  if (!card) return;
+  card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+};
+
+window.downloadJsonReport = function () {
+  if (!currentReport) return;
+  const blob = new Blob([JSON.stringify(currentReport, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'flakehound.report.json';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+};
+
+window.copyClusterId = function (id, btn, ev) {
+  ev.stopPropagation();
+  if (!navigator.clipboard) {
+    btn.textContent = id; // no clipboard API: show the full id instead
+    return;
+  }
+  navigator.clipboard.writeText(id).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = 'Copied ✓';
+    setTimeout(() => { btn.textContent = orig; }, 1500);
+  }).catch(() => { btn.textContent = id; });
+};
+
+window.toggleTrace = function (btn) {
+  const pre = btn.previousElementSibling;
+  const clamped = pre.classList.toggle('clamped');
+  btn.textContent = clamped ? 'Show full ↓' : 'Hide ↑';
+};
+
+/* ── Section builders ────────────────────────────────── */
+function scoreColor(score) {
+  if (score >= 0.66) return 'var(--accent)';
+  if (score >= 0.33) return 'var(--yellow)';
+  return 'var(--muted)';
+}
+
+function signalRow(s, quarantineIdx) {
+  const cls = s.classification === 'regression' ? 'reg' : s.classification === 'flaky' ? 'flk' : 'stb';
+  const label = s.classification === 'regression' ? 'REGRESSION' : s.classification === 'flaky' ? 'FLAKY' : 'STABLE';
+  const fileChip = s.testId.includes(' > ') ? s.testId.split(' > ')[0] : '';
+  const search = `${s.testId} ${s.classification} ${s.confidence} ${s.reason ?? ''}`.toLowerCase();
+  const dots = (s.history ?? []).map((h) => {
+    const title = `${relTime(h.timestamp)} · ${h.commitSha ? h.commitSha.slice(0, 7) : 'no sha'} · ${h.verdict}${h.retryFlips > 0 ? ' (retry flip)' : ''}`;
+    return `<span class="dot-wrap" title="${esc(title)}"><span class="dot ${esc(h.verdict)}"></span>${h.retryFlips > 0 ? '<span class="dot-flip">⚡</span>' : ''}</span>`;
+  }).join('');
+  return `
+    <div class="sig-row" data-search="${esc(search)}" onclick="toggleSignalRow(this)">
+      <div class="sig-main">
+        <span class="badge ${cls}">${label}</span>
+        <span class="sig-name" title="${esc(s.testId)}">${esc(s.testId)}</span>
+        <span class="score-track"><span class="score-fill" style="width:${Math.round(s.flakinessScore * 100)}%; background:${scoreColor(s.flakinessScore)}; display:block;"></span></span>
+      </div>
+      <div class="sig-chips">
+        <span class="chip conf-${esc(s.confidence)}">${esc(s.confidence)}</span>
+        ${fileChip ? `<span class="chip mono">${esc(fileChip)}</span>` : ''}
+        ${quarantineIdx >= 0 ? `<span class="chip q-chip" onclick="scrollToQuarantine(${quarantineIdx}, event)" title="Quarantined — jump to its card">⊘</span>` : ''}
+      </div>
+      ${s.reason ? `<div class="sig-reason">${esc(s.reason)}</div>` : ''}
+      <div class="sig-timeline">${dots || '<span class="c-meta">no run history</span>'}</div>
+    </div>`;
+}
+
+window.toggleSignalRow = function (row) {
+  const wasExpanded = row.classList.contains('expanded');
+  document.querySelectorAll('.sig-row.expanded').forEach((r) => r.classList.remove('expanded'));
+  if (!wasExpanded) row.classList.add('expanded');
+};
+
+function clusterCard(c) {
+  const search = `${c.id} ${c.representativeTrace} ${c.tests.join(' ')} ${c.hypothesis ? c.hypothesis.category + ' ' + c.hypothesis.explanation : ''}`.toLowerCase();
+  const lines = c.representativeTrace.split('\n').length;
+  const clamp = lines > 6;
+  return `
+    <div class="cluster-card" id="cluster-${esc(c.id)}" data-search="${esc(search)}">
+      <div class="cluster-top">
+        <button class="id-chip" onclick="copyClusterId('${esc(c.id)}', this, event)" title="Click to copy cluster id">${esc(c.id.slice(0, 8))}</button>
+        <span class="c-meta num">${c.occurrences} occurrence${c.occurrences !== 1 ? 's' : ''}</span>
+        <span class="c-meta num">${c.tests.length} test${c.tests.length !== 1 ? 's' : ''} affected</span>
+      </div>
+      ${c.hypothesis
+        ? `<div class="c-hypo" title="Interpretive only — does not affect scores, IDs, or CI gate">✦ AI: ${esc(c.hypothesis.explanation)}</div>`
+        : DEMO_MODE
+          ? '<div class="c-hypo" title="The AI layer runs via a local model or API key; the CI runner has neither, so it auto-skips. Scores, IDs, and the CI gate are unaffected.">✦ AI: skipped on this run — no model available in CI</div>'
+          : ''}
+      <pre class="c-trace${clamp ? ' clamped' : ''}">${renderTrace(c.representativeTrace)}</pre>
+      ${clamp ? '<button class="trace-toggle" onclick="toggleTrace(this)">Show full ↓</button>' : ''}
+    </div>`;
+}
+
+function quarantineCard(q, idx, signals) {
+  const sig = signals.find((s) => s.testId === q.testId);
+  const streak = releaseStreak(sig, q);
+  const cells = Array.from({ length: STABLE_RUNS_TO_RELEASE }, (_, i) =>
+    `<span class="rp-cell${i < streak ? ' done' : ''}"></span>`).join('');
+  return `
+    <div class="q-card" id="q-card-${idx}">
+      <div class="q-head">
+        <span class="q-name">⊘ ${esc(q.testId)}</span>
+        <span class="chip conf-${esc(q.confidence)}">${esc(q.confidence)}</span>
+      </div>
+      <div class="q-meta">
+        <span class="chip mono">${esc(q.file)}</span>
+        <span class="chip num">score ${q.flakinessScore.toFixed(2)}</span>
+        <span class="chip">since ${esc(day(q.quarantinedAt))}</span>
+        ${q.clusterId ? `<span class="chip q-chip" onclick="revealCluster('${esc(q.clusterId)}')">cluster ${esc(q.clusterId.slice(0, 8))}</span>` : ''}
+        ${q.issue
+          ? `<a class="chip" style="color:var(--blue); border-color:var(--blue);" href="${esc(q.issue.url)}" target="_blank" rel="noopener noreferrer">issue #${q.issue.number} ↗</a>`
+          : '<span class="chip">no issue — GITHUB_TOKEN unavailable</span>'}
+      </div>
+      <div class="rp">
+        <span class="rp-label">release progress</span>
+        <span class="rp-cells">${cells}</span>
+        <span class="rp-val">${streak}/${STABLE_RUNS_TO_RELEASE} clean passes</span>
+      </div>
+    </div>`;
+}
+
+/* Story arc (demo mode): detect → quarantine → recover, from real data. */
+function storyArc(report, qEntries) {
+  const events = [];
+  for (const s of report.signals) {
+    const hist = s.history ?? [];
+    if (s.classification === 'regression') {
+      const firstFail = hist.find((h) => h.verdict === 'fail');
+      if (firstFail) {
+        events.push({
+          t: firstFail.timestamp, dot: 'red', title: 'Regression lands',
+          desc: `${s.testId} starts failing at ${s.brokenSinceSha ? s.brokenSinceSha.slice(0, 7) : firstFail.commitSha} — the CI gate turns red.`,
+        });
+      }
+    }
+    if (s.classification === 'flaky') {
+      const firstSignal = hist.find((h) => h.verdict === 'fail' || h.retryFlips > 0);
+      if (firstSignal) {
+        events.push({
+          t: firstSignal.timestamp, dot: 'accent', title: 'Flakiness detected',
+          desc: `${s.testId} flips pass↔fail on the same commit — scored, not gated.`,
+        });
+      }
+    }
+  }
+  for (const q of qEntries) {
+    events.push({
+      t: q.quarantinedAt, dot: 'blue', title: 'Quarantined',
+      desc: `${q.testId} tagged out of the blocking lane${q.issue ? ` · issue #${q.issue.number} filed` : ''}.`,
+    });
+    const sig = report.signals.find((s) => s.testId === q.testId);
+    const streak = releaseStreak(sig, q);
+    if (streak > 0) {
+      const hist = (sig && sig.history) ? sig.history : [];
+      const last = hist[hist.length - 1];
+      events.push({
+        t: last ? last.timestamp : q.quarantinedAt, dot: 'green', title: 'Recovering',
+        desc: `${streak} consecutive clean pass${streak !== 1 ? 'es' : ''} in the non-blocking lane.`,
+      });
+      events.push({
+        t: null, dot: 'green hollow', title: streak >= STABLE_RUNS_TO_RELEASE ? 'Auto-release due' : 'Auto-release ahead',
+        desc: streak >= STABLE_RUNS_TO_RELEASE
+          ? 'Threshold reached — next run removes the tag and closes the issue.'
+          : `${STABLE_RUNS_TO_RELEASE - streak} more clean run${STABLE_RUNS_TO_RELEASE - streak !== 1 ? 's' : ''} and flakehound untags the test and closes the issue.`,
+      });
+    }
+  }
+  if (events.length === 0) return '';
+  events.sort((a, b) => (a.t === null) - (b.t === null) || Date.parse(a.t ?? 0) - Date.parse(b.t ?? 0));
+  return `
+    <section class="panel full-panel">
+      <div class="panel-head">
+        <h2 class="panel-title">Story arc</h2>
+        <span class="panel-hint">the demo's detect → quarantine → recover lifecycle, from live data</span>
+      </div>
+      <div class="arc-track">
+        ${events.map((e) => `
+          <div class="arc-event">
+            <div class="arc-dot ${e.dot}"></div>
+            <div class="arc-when">${e.t ? esc(relTime(e.t)) : 'upcoming'}</div>
+            <div class="arc-title">${esc(e.title)}</div>
+            <div class="arc-desc">${esc(e.desc)}</div>
+          </div>`).join('')}
+      </div>
+    </section>`;
+}
+
+/* ── Render ──────────────────────────────────────────── */
 function render(report, quarantine, source) {
   currentReport = report;
   const { summary, signals, clusters, gate } = report;
   const qEntries = (quarantine && Array.isArray(quarantine.quarantined)) ? quarantine.quarantined : [];
-  const quarantinedIds = new Set(qEntries.map((q) => q.testId));
-  const regressions = signals.filter((s) => s.classification === 'regression');
-  const flaky = [...signals.filter((s) => s.classification === 'flaky')]
-    .sort((a, b) => b.flakinessScore - a.flakinessScore);
-  const stable = signals.filter((s) => s.classification === 'stable' || s.classification === 'passed');
-  const totalFailures = clusters.reduce((n, c) => n + c.occurrences, 0);
-  const failing = gate.newRegressions.length > 0;
+  const qIndexByTest = new Map(qEntries.map((q, i) => [q.testId, i]));
 
-  // Render Navbar Metadata
-  document.getElementById('meta').innerHTML = `
-    <span class="meta-badge">Runs: ${summary.testRuns}</span>
-    <span class="meta-badge">Files: ${summary.filesParsed}</span>
-    <span class="meta-badge">Tests: ${summary.testsAnalyzed}</span>
-    <span class="meta-badge">Generated: ${esc(day(report.generatedAt))}</span>
-    <span class="meta-badge" style="color:var(--primary-light)">Src: ${esc(source)}</span>
-  `;
+  const regressions = signals.filter((s) => s.classification === 'regression');
+  const flaky = signals.filter((s) => s.classification === 'flaky');
+
+  // Header extras
+  if (DEMO_MODE) {
+    document.getElementById('brand').innerHTML = `
+      <span class="wordmark">🐕 flakehound<span class="demo-suffix"> / demo</span></span>
+      <a class="tool-link" href="https://mayageva11.github.io/flakehound/">← tool</a>`;
+  }
+  document.getElementById('last-run').textContent = `Last run: ${relTime(report.generatedAt)}`;
+  document.getElementById('footer').innerHTML = `
+    Generated from <code>flakehound.report.json</code> (${esc(source)}) · ${esc(relTime(report.generatedAt))} ·
+    <a href="https://github.com/mayageva11/flakehound" target="_blank" rel="noopener noreferrer">github.com/mayageva11/flakehound</a>`;
 
   const parts = [];
 
-  /* 1. CI Gate Banner */
+  /* Hero metrics */
   parts.push(`
-    <div class="gate-banner ${failing ? 'fail' : 'pass'}">
-      <div class="gate-icon">
-        ${failing 
-          ? `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>`
-          : `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>`
-        }
-      </div>
-      <div class="gate-content">
-        <div class="gate-text-group">
-          <h3 class="gate-title">${failing 
-            ? `${gate.newRegressions.length} NEW REGRESSION${gate.newRegressions.length > 1 ? 'S' : ''} DETECTED` 
-            : 'ALL CLEAR — CI GATE PASSED'}</h3>
-          <span class="gate-desc">${failing ? 'CI gate failed — CLI returned exit code 1' : 'No new regressions — CLI returned exit code 0'}${
-            gate.baselineUsed ? '' : ' · running without comparison baseline (fail-safe mode)'}</span>
-        </div>
-        <div class="gate-stats-pills">
-          <span class="gate-pill new">new ${gate.newRegressions.length}</span>
-          <span class="gate-pill known">known ${gate.knownRegressions.length}</span>
-          <span class="gate-pill resolved">resolved ${gate.resolvedRegressions.length}</span>
-        </div>
-      </div>
-    </div>
-  `);
+    <div class="hero">
+      <div class="stat"><div class="stat-num">${summary.testRuns}</div><div class="stat-label">Runs Analyzed</div></div>
+      <div class="stat"><div class="stat-num">${signals.length}</div><div class="stat-label">Tests Analyzed</div></div>
+      <div class="stat"><div class="stat-num${regressions.length > 0 ? ' red' : ''}">${regressions.length}</div><div class="stat-label">Regressions</div></div>
+      <div class="stat"><div class="stat-num${flaky.length > 0 ? ' accent' : ''}">${flaky.length}</div><div class="stat-label">Flaky Tests</div></div>
+    </div>`);
 
-  /* 2. Metric Cards Grid */
+  /* CI gate banner */
+  let gateCls, gateMsg;
+  if (gate.newRegressions.length > 0) {
+    gateCls = 'red';
+    gateMsg = `✗&nbsp; ${gate.newRegressions.length} new regression${gate.newRegressions.length !== 1 ? 's' : ''} detected — CI gate would fail (exit 1)`;
+  } else if (qEntries.length > 0) {
+    gateCls = 'accent';
+    gateMsg = `⊘&nbsp; Clean run — ${qEntries.length} quarantine action${qEntries.length !== 1 ? 's' : ''} pending (dry-run)`;
+  } else {
+    gateCls = 'green';
+    gateMsg = '✓&nbsp; Clean — no new regressions (exit 0)';
+  }
   parts.push(`
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-label">Total Test Runs</div>
-        <div class="stat-val">${summary.testRuns}</div>
-        <div class="stat-sub">Across ${summary.filesParsed} file${summary.filesParsed > 1 ? 's' : ''}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Tests Analyzed</div>
-        <div class="stat-val">${summary.testsAnalyzed}</div>
-        <div class="stat-sub">${regressions.length} regression${regressions.length !== 1 ? 's' : ''} · ${flaky.length} flaky</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Failure Clusters</div>
-        <div class="stat-val">${clusters.length}</div>
-        <div class="stat-sub">${totalFailures} occurrences in total</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Metadata Coverage</div>
-        <div class="stat-val">${Math.round(((summary.metadataSources.sidecar + summary.metadataSources.dirname) / (summary.testRuns || 1)) * 100)}%</div>
-        <div class="stat-sub">${summary.metadataSources.sidecar} sidecar · ${summary.metadataSources.dirname} dir</div>
-      </div>
-    </div>
-  `);
+    <div class="gate ${gateCls}">
+      <span class="gate-msg">${gateMsg}</span>
+      <span class="gate-codes">Exit codes: 0 clean · 1 regression · 2 error</span>
+    </div>`);
 
-  /* 3. Toolbar (Tabs + Search) */
-  parts.push(`
-    <div class="toolbar">
-      <div class="tabs">
-        <button class="tab-btn active" data-tab="all">
-          All Signals <span class="badge badge-neutral">${signals.length}</span>
-        </button>
-        <button class="tab-btn" data-tab="regressions">
-          Regressions <span class="badge badge-red">${regressions.length}</span>
-        </button>
-        <button class="tab-btn" data-tab="flaky">
-          Flaky <span class="badge badge-amber">${flaky.length}</span>
-        </button>
-      </div>
-      <div class="search-wrapper">
-        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-          <circle cx="11" cy="11" r="8"></circle>
-          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-        </svg>
-        <input type="text" id="search-input" class="search-input" placeholder="Search test name, SHA, failure reason..." autocomplete="off">
-      </div>
-    </div>
-  `);
+  /* Signals + clusters split */
+  const sorted = [
+    ...regressions,
+    ...[...flaky].sort((a, b) => b.flakinessScore - a.flakinessScore),
+    ...signals.filter((s) => s.classification !== 'regression' && s.classification !== 'flaky'),
+  ];
+  const ranked = [...clusters].sort((a, b) => b.occurrences - a.occurrences);
 
-  /* 4. Signals split-grid view */
   parts.push(`
-    <div class="grid" id="signals-grid">
-      <!-- Regressions column -->
-      <section class="grid-section" id="regressions-section">
-        <h2 class="section-title">
-          <span class="section-dot red"></span>
-          Regressions (${regressions.length})
-        </h2>
-        <div id="regressions-list">
-          ${regressions.length === 0
-            ? '<div class="empty-state success-style"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>No regressions detected</div>'
-            : regressions.map((s) => `
-              <div class="card reg signal-card" data-search="${esc(s.testId.toLowerCase())} ${esc(s.reason ? s.reason.toLowerCase() : '')}">
-                <div class="card-header">
-                  <div class="card-title">${esc(s.testId)}</div>
-                </div>
-                <div class="card-subtitle reg">broken since SHA: ${esc(s.brokenSinceSha ?? '?')}</div>
-                ${s.reason ? `<div class="card-reason">${esc(s.reason)}</div>` : ''}
-                ${runHistory(s)}
-              </div>`).join('')}
+    <div class="split">
+      <section class="panel">
+        <div class="panel-head">
+          <h2 class="panel-title">Test Signals</h2>
+          <span class="count-badge">${signals.length}</span>
+          <span class="filter-results" id="sig-results"></span>
         </div>
-        <div id="regressions-empty" class="empty-state hidden">No matching regressions found</div>
+        <input class="filter-input" id="filter-input" type="text" placeholder="Filter tests..." autocomplete="off">
+        <div id="signal-list">
+          ${sorted.length === 0
+            ? '<div class="empty">No test signals yet — run flakehound analyze</div>'
+            : sorted.map((s) => signalRow(s, qIndexByTest.has(s.testId) ? qIndexByTest.get(s.testId) : -1)).join('')}
+        </div>
+        <div class="empty hidden" id="sig-no-match">No matching tests</div>
       </section>
 
-      <!-- Flaky column -->
-      <section class="grid-section" id="flaky-section">
-        <h2 class="section-title">
-          <span class="section-dot text-muted" style="background:var(--warning); box-shadow:0 0 8px var(--warning)"></span>
-          Flaky Candidates (${flaky.length})
-        </h2>
-        <div id="flaky-list">
-          ${flaky.length === 0
-            ? '<div class="empty-state success-style"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>No flaky tests detected</div>'
-            : flaky.map((s) => `
-              <div class="card flk signal-card" data-search="${esc(s.testId.toLowerCase())} ${esc(s.confidence.toLowerCase())} ${esc(s.reason ? s.reason.toLowerCase() : '')}${quarantinedIds.has(s.testId) ? ' quarantined' : ''}">
-                <div class="card-header">
-                  <div class="card-title">${esc(s.testId)}</div>
-                  <div style="display:flex; gap:6px; align-items:center; flex-shrink:0;">
-                    ${quarantinedIds.has(s.testId) ? '<a class="q-chip" href="#quarantine-section">⊘ quarantined</a>' : ''}
-                    <span class="chip ${esc(s.confidence)}">${esc(s.confidence)}</span>
-                  </div>
-                </div>
-                <div class="score-bar-wrapper">
-                  <div class="score-bar-track">
-                    <div class="score-bar-fill" style="width: ${Math.round(s.flakinessScore * 100)}%"></div>
-                  </div>
-                  <div class="score-bar-val">${s.flakinessScore.toFixed(2)}</div>
-                </div>
-                ${s.reason ? `<div class="card-reason">${esc(s.reason)}</div>` : ''}
-                ${runHistory(s)}
-              </div>`).join('')}
+      <section class="panel">
+        <div class="panel-head">
+          <h2 class="panel-title">Failure Clusters</h2>
+          <span class="count-badge">${clusters.length}</span>
+          <span class="panel-hint">ranked by impact</span>
+          <span class="filter-results" id="cluster-results"></span>
         </div>
-        <div id="flaky-empty" class="empty-state hidden">No matching flaky tests found</div>
+        <div id="cluster-list">
+          ${ranked.length === 0
+            ? '<div class="empty">No failure clusters yet</div>'
+            : ranked.map(clusterCard).join('')}
+        </div>
+        <div class="empty hidden" id="cluster-no-match">No matching clusters</div>
       </section>
-    </div>
+    </div>`);
 
-    <!-- Collapsible Stable/Healthy Tests Panel -->
-    <div style="margin-top: 20px;" id="stable-tests-container-block">
-      <details class="cluster-card" id="stable-tests-details" style="border-color: var(--panel-border); background: var(--panel-bg);">
-        <summary style="padding: 12px 16px;">
-          <div class="summary-caret">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="9 18 15 12 9 6"/></svg>
-          </div>
-          <span class="section-title" style="margin: 0; text-transform: none; font-size: 13.5px; font-weight: 600; color: var(--text);">
-            <span class="section-dot" style="background: var(--success); box-shadow: 0 0 8px var(--success); display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; vertical-align: middle;"></span>
-            Stable / Healthy Tests (${stable.length})
-          </span>
-        </summary>
-        <div class="cluster-body" style="padding: 8px 16px 16px 16px;">
-          ${stable.length === 0 
-            ? '<div class="empty-state" style="padding: 10px 0;">No stable tests found</div>'
-            : `<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; margin-top: 8px;" id="stable-tests-list">
-                ${stable.map(s => `
-                  <div class="card signal-card stable-test-item" data-search="${esc(s.testId.toLowerCase())}" style="padding: 10px; background: rgba(0,0,0,0.15); border: 1px solid var(--border); border-radius: 6px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 0;">
-                    <span style="font-family: var(--mono); font-size: 12.5px; color: var(--text-muted); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 80%;" title="${esc(s.testId)}">${esc(s.testId)}</span>
-                    <span class="chip high" style="font-size: 9px; padding: 1px 4px;">Stable</span>
-                  </div>
-                `).join('')}
-               </div>`
-          }
-        </div>
-      </details>
-    </div>
-  `);
-
-  /* 4b. Quarantine panel — only when the state artifact exists and has entries */
+  /* Quarantine panel — omitted entirely when there are no entries */
   if (qEntries.length > 0) {
     parts.push(`
-      <section class="grid-section" id="quarantine-section" style="margin-top: 20px;">
-        <h2 class="section-title">
-          <span class="section-dot purple"></span>
-          Quarantined Tests (${qEntries.length}) — auto-managed by flakehound quarantine
-        </h2>
-        <div>
-          ${qEntries.map((q) => {
-            const sig = signals.find((s) => s.testId === q.testId);
-            const streak = releaseStreak(sig, q);
-            const cells = Array.from({ length: STABLE_RUNS_TO_RELEASE }, (_, i) =>
-              `<span class="rp-cell${i < streak ? ' done' : ''}"></span>`).join('');
-            return `
-              <div class="card qrt">
-                <div class="card-header">
-                  <div class="card-title">⊘ ${esc(q.testId)}</div>
-                  <span class="chip ${esc(q.confidence)}">${esc(q.confidence)}</span>
-                </div>
-                <div class="q-meta">
-                  <span class="q-file">${esc(q.file)}</span>
-                  <span class="q-file">score ${q.flakinessScore.toFixed(2)}</span>
-                  <span class="q-file">since ${esc(day(q.quarantinedAt))}</span>
-                  ${q.clusterId ? `<span class="q-chip" onclick="revealCluster('${esc(q.clusterId)}')">cluster ${esc(q.clusterId)}</span>` : ''}
-                  ${q.issue
-                    ? `<a class="q-issue-link" href="${esc(q.issue.url)}" target="_blank" rel="noopener noreferrer">issue #${q.issue.number} ↗</a>`
-                    : '<span class="q-issue-none">no issue — GITHUB_TOKEN unavailable</span>'}
-                </div>
-                <div class="release-progress">
-                  <span class="rp-label">release progress</span>
-                  <span class="rp-cells">${cells}</span>
-                  <span class="rp-val">${streak}/${STABLE_RUNS_TO_RELEASE} clean passes</span>
-                </div>
-              </div>`;
-          }).join('')}
+      <section class="panel full-panel">
+        <div class="panel-head">
+          <h2 class="panel-title">⊘ Quarantine — ${qEntries.length} test${qEntries.length !== 1 ? 's' : ''} managed</h2>
         </div>
+        <p class="panel-sub">High-confidence flaky tests tagged out of the blocking CI lane. The non-blocking lane keeps running them until release.</p>
+        ${qEntries.map((q, i) => quarantineCard(q, i, signals)).join('')}
         <div class="q-note">
           Quarantined tests are <strong>not skipped</strong>: they keep running under the
           <code>@flakehound-quarantined</code> tag in a non-blocking CI lane while the blocking lane
@@ -1507,410 +940,60 @@ function render(report, quarantine, source) {
           passes flakehound removes the tag, closes the linked issue, and restores the spec file
           byte-identically.
         </div>
-      </section>
-    `);
+      </section>`);
   }
 
-  /* 5. Failure Clusters section */
-  const ranked = [...clusters].sort((a, b) =>
-    b.occurrences * b.tests.length - a.occurrences * a.tests.length ||
-    a.representativeTrace.localeCompare(b.representativeTrace));
-
-  parts.push(`
-    <section class="clusters-section">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
-        <h2 class="section-title" style="margin: 0;">
-          <svg style="width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:2.5; vertical-align:middle; margin-right:4px;" viewBox="0 0 24 24">
-            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-            <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-            <line x1="12" y1="22.08" x2="12" y2="12"/>
-          </svg>
-          Failure Clusters (${clusters.length}) — Ranked by Impact
-        </h2>
-        <div style="display: flex; gap: 8px;">
-          <button class="copy-btn" style="position: static; margin-top: 0; padding: 4px 8px; height: 26px;" onclick="toggleAllClusters(true)">Expand All</button>
-          <button class="copy-btn" style="position: static; margin-top: 0; padding: 4px 8px; height: 26px;" onclick="toggleAllClusters(false)">Collapse All</button>
-        </div>
-      </div>
-      <div class="cluster-list" id="cluster-list-container">
-        ${clusters.length === 0
-          ? '<div class="empty-state">No failures to cluster — all tests passing</div>'
-          : ranked.map((c, i) => {
-              const clusterSearchStr = `${esc(c.id.toLowerCase())} ${esc(c.representativeTrace.toLowerCase())} ${esc(c.tests.join(' ').toLowerCase())} ${c.hypothesis ? esc(c.hypothesis.category.toLowerCase()) + ' ' + esc(c.hypothesis.explanation.toLowerCase()) : ''}`;
-              const copyId = `copy-btn-${c.id}`;
-              return `
-              <details class="cluster-card" ${i === 0 ? 'open' : ''} data-search="${clusterSearchStr}" data-id="${c.id}">
-                <summary>
-                  <div class="summary-caret">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="9 18 15 12 9 6"/></svg>
-                  </div>
-                  <span class="cluster-rank">#${i + 1}</span>
-                  <span class="cluster-head" title="${esc(c.representativeTrace)}">${esc(headOf(c.representativeTrace))}</span>
-                  ${gate.baselineUsed && (gate.newClusters ?? []).includes(c.id) ? '<span class="cluster-new-badge">NEW</span>' : ''}
-                  <span class="cluster-badge">${c.occurrences}× over ${c.tests.length} test${c.tests.length > 1 ? 's' : ''}</span>
-                  <span class="cluster-id-badge">${esc(c.id)}</span>
-                </summary>
-                <div class="cluster-body">
-                  ${c.hypothesis ? `
-                    <div class="hypothesis-box">
-                      <div class="hypothesis-header">
-                        <span class="hypothesis-ai-label">AI Analysis</span>
-                        <span class="hypothesis-cat" style="color:${CATEGORY_COLORS[c.hypothesis.category] ?? 'var(--info)'}; border-color:${CATEGORY_COLORS[c.hypothesis.category] ?? 'var(--info)'}">${esc(c.hypothesis.category)}</span>
-                      </div>
-                      <span class="hypothesis-exp">${esc(c.hypothesis.explanation)}</span>
-                    </div>` : ''}
-                  <div class="trace-container">
-                    <button class="copy-btn" id="${copyId}" onclick="copyClusterTrace('${c.id}', '${copyId}')">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                      Copy Trace
-                    </button>
-                    <pre class="trace-block">${renderTrace(c.representativeTrace)}</pre>
-                  </div>
-                  <div class="affected-tests">
-                    <strong>Affected Tests:</strong>
-                    ${c.tests.map((t) => `<code>${esc(t)}</code>`).join('')}
-                    <div class="affected-range">
-                      Interval: ${esc(day(c.firstSeen))} &rarr; ${esc(day(c.lastSeen))}
-                    </div>
-                  </div>
-                </div>
-              </details>`;
-            }).join('')}
-      </div>
-      <div id="clusters-empty" class="empty-state hidden">No matching failure clusters found</div>
-    </section>
-  `);
-
-  /* 6. Timeline section */
-  if (clusters.length > 0) {
-    const min = Math.min(...clusters.map((c) => Date.parse(c.firstSeen)));
-    const max = Math.max(...clusters.map((c) => Date.parse(c.lastSeen)));
-    const span = Math.max(1, max - min);
-    parts.push(`
-      <section class="timeline-section" id="timeline-container-section">
-        <h2 class="section-title">
-          <svg style="width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:2.5; vertical-align:middle; margin-right:4px;" viewBox="0 0 24 24">
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-            <line x1="16" y1="2" x2="16" y2="6"/>
-            <line x1="8" y1="2" x2="8" y2="6"/>
-            <line x1="3" y1="10" x2="21" y2="10"/>
-          </svg>
-          Cluster Failure Timeline
-        </h2>
-        <div id="timeline-rows-container">
-          ${ranked.map((c) => {
-            const left = ((Date.parse(c.firstSeen) - min) / span) * 100;
-            const width = Math.max(3, ((Date.parse(c.lastSeen) - Date.parse(c.firstSeen)) / span) * 100);
-            return `
-              <div class="tl-row" data-id="${c.id}">
-                <div class="tl-label" title="${esc(headOf(c.representativeTrace))}">${esc(headOf(c.representativeTrace))}</div>
-                <div class="tl-track">
-                  <div class="tl-bar" style="left:${left}%; width:${Math.min(width, 100 - left)}%"></div>
-                </div>
-              </div>`;
-          }).join('')}
-        </div>
-        <div class="tl-axis">
-          <span>${esc(day(new Date(min).toISOString()))}</span>
-          <span>${esc(day(new Date(max).toISOString()))}</span>
-        </div>
-      </section>
-    `);
-  }
-
-  /* 7. Bottom Metadata + CI details split */
-  parts.push(`
-    <div class="bottom-grid">
-      <!-- Donut Panel -->
-      <section class="grid-section">
-        <h2 class="section-title">
-          <svg style="width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:2.5; vertical-align:middle; margin-right:4px;" viewBox="0 0 24 24">
-            <path d="M21.21 15.89A10 10 0 1 1 8 2.83"/>
-            <path d="M22 12A10 10 0 0 0 12 2v10z"/>
-          </svg>
-          Metadata Sources
-        </h2>
-        <div class="donut-container">
-          ${donut(summary.metadataSources)}
-          <div class="legend-list">
-            <div class="legend-item"><i class="legend-color" style="background:#38bdf8"></i> sidecar: <b>${summary.metadataSources.sidecar}</b></div>
-            <div class="legend-item"><i class="legend-color" style="background:#818cf8"></i> dirname: <b>${summary.metadataSources.dirname}</b></div>
-            <div class="legend-item"><i class="legend-color" style="background:#475569"></i> mtime: <b>${summary.metadataSources.mtime}</b></div>
-          </div>
-        </div>
-      </section>
-
-      <!-- Gate Details Panel -->
-      <section class="grid-section">
-        <h2 class="section-title">
-          <svg style="width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:2.5; vertical-align:middle; margin-right:4px;" viewBox="0 0 24 24">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-          </svg>
-          CI Gate Execution Log
-        </h2>
-        <div class="gate-detail-rows">
-          <div class="gate-detail-row">
-            <span class="gate-detail-key new">new</span>
-            <span class="gate-detail-val">${gate.newRegressions.map(esc).join(', ') || 'None'}</span>
-          </div>
-          <div class="gate-detail-row">
-            <span class="gate-detail-key known">known</span>
-            <span class="gate-detail-val">${gate.knownRegressions.map(esc).join(', ') || 'None'}</span>
-          </div>
-          <div class="gate-detail-row">
-            <span class="gate-detail-key res">resolved</span>
-            <span class="gate-detail-val">${gate.resolvedRegressions.map(esc).join(', ') || 'None'}</span>
-          </div>
-          <div class="gate-detail-row" style="margin-top: 4px; border-top: 1px dashed var(--border); padding-top: 8px;">
-            <span class="gate-detail-key" style="color:var(--text-muted)">baseline</span>
-            <span class="gate-detail-val">${gate.baselineUsed ? 'Compared against baseline report snapshot' : 'None configured — all failures treated as new regressions'}</span>
-          </div>
-        </div>
-      </section>
-    </div>
-  `);
+  /* Story arc — demo mode only */
+  if (DEMO_MODE) parts.push(storyArc(report, qEntries));
 
   document.getElementById('app').innerHTML = parts.join('');
-
-  // Register Event Listeners
-  initInteractiveFeatures();
+  initFilter();
 }
 
-function initInteractiveFeatures() {
-  const tabBtns = document.querySelectorAll('.tab-btn');
-  const searchInput = document.getElementById('search-input');
-  
-  let activeTab = 'all';
-  let searchQuery = '';
+/* ── Filter: signal rows AND cluster cards, "/" focus, ESC clear ── */
+function initFilter() {
+  const input = document.getElementById('filter-input');
+  if (!input) return;
 
-  function filterData() {
-    const query = searchQuery.trim().toLowerCase();
-    
-    // 1. Filter signals cards
-    const regressionsSection = document.getElementById('regressions-section');
-    const flakySection = document.getElementById('flaky-section');
-    const signalsGrid = document.getElementById('signals-grid');
-
-    const regCards = document.querySelectorAll('#regressions-list .signal-card');
-    const flakyCards = document.querySelectorAll('#flaky-list .signal-card');
-
-    let visibleRegCount = 0;
-    let visibleFlakyCount = 0;
-
-    regCards.forEach(card => {
-      const text = card.getAttribute('data-search') || '';
-      const matchesSearch = text.includes(query);
-      const isVisible = activeTab !== 'flaky' && matchesSearch;
-      if (isVisible) {
-        card.classList.remove('hidden');
-        visibleRegCount++;
-      } else {
-        card.classList.add('hidden');
-      }
+  function apply() {
+    const q = input.value.trim().toLowerCase();
+    let sigVisible = 0;
+    document.querySelectorAll('#signal-list .sig-row').forEach((row) => {
+      const match = (row.getAttribute('data-search') || '').includes(q);
+      row.classList.toggle('hidden', !match);
+      if (match) sigVisible++;
     });
-
-    flakyCards.forEach(card => {
-      const text = card.getAttribute('data-search') || '';
-      const matchesSearch = text.includes(query);
-      const isVisible = activeTab !== 'regressions' && matchesSearch;
-      if (isVisible) {
-        card.classList.remove('hidden');
-        visibleFlakyCount++;
-      } else {
-        card.classList.add('hidden');
-      }
+    let cluVisible = 0;
+    document.querySelectorAll('#cluster-list .cluster-card').forEach((card) => {
+      const match = (card.getAttribute('data-search') || '').includes(q);
+      card.classList.toggle('hidden', !match);
+      if (match) cluVisible++;
     });
-
-    // Handle columns layouts and section visibility
-    if (activeTab === 'all') {
-      signalsGrid.classList.remove('full-width');
-      regressionsSection.classList.remove('hidden');
-      flakySection.classList.remove('hidden');
-    } else if (activeTab === 'regressions') {
-      signalsGrid.classList.add('full-width');
-      regressionsSection.classList.remove('hidden');
-      flakySection.classList.add('hidden');
-    } else if (activeTab === 'flaky') {
-      signalsGrid.classList.add('full-width');
-      regressionsSection.classList.add('hidden');
-      flakySection.classList.remove('hidden');
-    }
-
-    // Toggle Empty state indicators
-    const regEmpty = document.getElementById('regressions-empty');
-    if (regEmpty) {
-      if (visibleRegCount === 0 && activeTab !== 'flaky') {
-        regEmpty.classList.remove('hidden');
-      } else {
-        regEmpty.classList.add('hidden');
-      }
-    }
-
-    const flakyEmpty = document.getElementById('flaky-empty');
-    if (flakyEmpty) {
-      if (visibleFlakyCount === 0 && activeTab !== 'regressions') {
-        flakyEmpty.classList.remove('hidden');
-      } else {
-        flakyEmpty.classList.add('hidden');
-      }
-    }
-
-    // Filter stable tests
-    const stableCards = document.querySelectorAll('#stable-tests-list .stable-test-item');
-    let visibleStableCount = 0;
-    stableCards.forEach(card => {
-      const text = card.getAttribute('data-search') || '';
-      const matchesSearch = text.includes(query);
-      if (matchesSearch) {
-        card.classList.remove('hidden');
-        visibleStableCount++;
-      } else {
-        card.classList.add('hidden');
-      }
-    });
-
-    const stableContainer = document.getElementById('stable-tests-container-block');
-    const stableDetails = document.getElementById('stable-tests-details');
-    if (stableContainer) {
-      if (activeTab !== 'all') {
-        stableContainer.style.display = 'none';
-      } else {
-        stableContainer.style.display = 'block';
-        if (query.length > 0 && visibleStableCount > 0) {
-          stableDetails.open = true;
-        }
-      }
-    }
-
-    // 2. Filter cluster cards
-    const clusterCards = document.querySelectorAll('#cluster-list-container .cluster-card');
-    let visibleClusterCount = 0;
-    const visibleClusterIds = new Set();
-
-    clusterCards.forEach(card => {
-      const text = card.getAttribute('data-search') || '';
-      const matchesSearch = text.includes(query);
-      if (matchesSearch) {
-        card.classList.remove('hidden');
-        visibleClusterCount++;
-        visibleClusterIds.add(card.getAttribute('data-id'));
-      } else {
-        card.classList.add('hidden');
-      }
-    });
-
-    const clustersEmpty = document.getElementById('clusters-empty');
-    if (clustersEmpty) {
-      if (visibleClusterCount === 0) {
-        clustersEmpty.classList.remove('hidden');
-      } else {
-        clustersEmpty.classList.add('hidden');
-      }
-    }
-
-    // 3. Filter timeline rows based on visible clusters
-    const tlRows = document.querySelectorAll('#timeline-rows-container .tl-row');
-    let visibleTlRows = 0;
-    tlRows.forEach(row => {
-      const id = row.getAttribute('data-id');
-      if (visibleClusterIds.has(id)) {
-        row.classList.remove('hidden');
-        visibleTlRows++;
-      } else {
-        row.classList.add('hidden');
-      }
-    });
-
-    const tlSection = document.getElementById('timeline-container-section');
-    if (tlSection) {
-      if (visibleTlRows === 0) {
-        tlSection.style.display = 'none';
-      } else {
-        tlSection.style.display = 'block';
-      }
-    }
+    const sigRes = document.getElementById('sig-results');
+    const cluRes = document.getElementById('cluster-results');
+    sigRes.textContent = q ? `${sigVisible} result${sigVisible !== 1 ? 's' : ''}` : '';
+    cluRes.textContent = q ? `${cluVisible} result${cluVisible !== 1 ? 's' : ''}` : '';
+    document.getElementById('sig-no-match').classList.toggle('hidden', !(q && sigVisible === 0));
+    document.getElementById('cluster-no-match').classList.toggle('hidden', !(q && cluVisible === 0));
   }
 
-  // Register Tab buttons click event
-  tabBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      tabBtns.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      activeTab = btn.getAttribute('data-tab');
-      filterData();
-    });
-  });
+  input.addEventListener('input', apply);
 
-  // Register Search typing event
-  if (searchInput) {
-    searchInput.addEventListener('input', (e) => {
-      searchQuery = e.target.value;
-      filterData();
-    });
-  }
-
-  // Timeline-to-Cluster click navigation
-  const tlRows = document.querySelectorAll('#timeline-rows-container .tl-row');
-  tlRows.forEach(row => {
-    row.style.cursor = 'pointer';
-    row.addEventListener('click', () => window.revealCluster(row.getAttribute('data-id')));
-  });
-
-  // Global Keyboard Shortcuts
   window.addEventListener('keydown', (e) => {
-    if (e.key === '/' && document.activeElement !== searchInput) {
+    if (e.key === '/' && document.activeElement !== input) {
       e.preventDefault();
-      if (searchInput) {
-        searchInput.focus();
-        searchInput.select();
-      }
+      input.focus();
+      input.select();
     }
-    if (e.key === 'Escape') {
-      if (document.activeElement === searchInput) {
-        searchInput.value = '';
-        searchInput.blur();
-        searchQuery = '';
-        filterData();
-      } else {
-        window.toggleAllClusters(false);
-      }
+    if (e.key === 'Escape' && document.activeElement === input) {
+      input.value = '';
+      input.blur();
+      apply();
     }
   });
 }
 
-function headOf(trace) {
-  const head = trace.split(' at ')[0].trim();
-  return head.length > 72 ? head.slice(0, 72) + '…' : head;
-}
-
-function donut(sources) {
-  const entries = [
-    [sources.sidecar, '#38bdf8'],
-    [sources.dirname, '#818cf8'],
-    [sources.mtime, '#475569'],
-  ];
-  const total = entries.reduce((n, [v]) => n + v, 0);
-  if (total === 0) return '<div class="empty-state" style="padding: 10px;">No runs metadata</div>';
-  let offset = 25; 
-  const segs = entries.filter(([v]) => v > 0).map(([v, color]) => {
-    const pct = (v / total) * 100;
-    const seg = `<circle r="15.9155" cx="21" cy="21" fill="transparent" stroke="${color}"
-      stroke-width="4.5" stroke-dasharray="${pct} ${100 - pct}" stroke-dashoffset="${offset}"></circle>`;
-    offset -= pct;
-    return seg;
-  }).join('');
-  return `
-    <svg width="96" height="96" viewBox="0 0 42 42" role="img" aria-label="metadata sources" style="flex-shrink:0;">
-      <circle r="15.9155" cx="21" cy="21" fill="transparent" stroke="rgba(255,255,255,0.03)" stroke-width="4.5"></circle>
-      ${segs}
-      <text x="21" y="22.5" text-anchor="middle" font-size="6.5" fill="var(--text)" font-family="var(--mono)" font-weight="600">${total}</text>
-      <text x="21" y="26.5" text-anchor="middle" font-size="3.5" fill="var(--text-muted)" font-family="var(--sans)">runs</text>
-    </svg>
-  `;
-}
-
-// Data fetch logic — the quarantine state is optional: absence just hides the panel.
+/* Data fetch — the quarantine state is optional: absence just hides the panel. */
 Promise.all([
   fetch('flakehound.report.json')
     .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
