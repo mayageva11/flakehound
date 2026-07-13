@@ -9,7 +9,20 @@
 
 **Live dashboard:** [mayageva11.github.io/flakehound](https://mayageva11.github.io/flakehound/) — rendered from a real `flakehound.report.json`.
 
+**Jump to:** [Quick start](#quick-start) · [Commands](#commands) · [Dashboard](#dashboard) · [CI integration](#ci-integration) · [Configuration](#configuration) · [Quarantine](#quarantine) · [Architecture](#architecture)
+
 **Root-cause analysis for flaky tests.** Existing tools count pass/fail and tell you *that* a test is flaky — flakehound clusters failures by their underlying cause and tells you **"23 failures over 3 weeks = 4 unique bugs"**, separates genuinely flaky tests from hard regressions, and gates your CI on *new* regressions only.
+
+## At a glance
+
+- **Detects flakiness by behavior, not fail rate** — pass↔fail flips on the *same commit* and retry flips within a run ([how it works](#how-it-works))
+- **Separates flaky from broken** — a test failing 100% since one commit is a *regression*; the two are mutually exclusive ([how it works](#how-it-works))
+- **Clusters failures by root cause** — "23 failures = 4 bugs"; one cluster = one bug, even when it spans many tests ([how it works](#how-it-works))
+- **Gates CI on *new* regressions only** — fails once when a bug lands, not on every run until it's fixed ([CI integration](#ci-integration))
+- **Quarantines flaky tests — and releases them itself** — reviewable git edits, one GitHub issue per test, auto-release after N clean runs ([quarantine](#quarantine))
+- **A dashboard built for triage** — new failures first, signals grouped by verdict, one line per cluster ([dashboard](#dashboard))
+
+Input is JUnit XML — the one format every test runner and CI already emits.
 
 ```
 flakehound — 12 test runs across 4 files, 3 tests analyzed
@@ -38,6 +51,20 @@ CI gate: 1 new, 0 known, 0 resolved regression(s)
 3. **Cluster** — normalizes stack traces (strips line numbers, addresses, durations, path prefixes — keeps error classes, function names, filenames) and groups structurally identical failures. Similarity is **head-weighted**: error-class/message tokens weigh double, so the bug's identity dominates shared library frames. Guiding principle: *prefer false-split over false-merge* — the tool exists to surface bugs, never to hide them.
 4. **Interpret** (optional) — sends each cluster's representative trace to a pluggable inference provider — a local Ollama model when one is reachable (zero cost, nothing leaves your machine), else the Claude API when `ANTHROPIC_API_KEY` is set — for a one-line root-cause hypothesis. The deterministic core works identically without either.
 5. **Report + gate** — terminal report, `flakehound.report.json` artifact, and exit codes usable as a CI gate. With a baseline, clusters are also diffed — a **NEW** cluster means a bug shape never seen before (informational; only new *regressions* fail the gate). `flakehound explain <testId>` prints any test's run-by-run story.
+
+## Dashboard
+
+A single static file ([`docs/index.html`](docs/index.html)) renders `flakehound.report.json` — no build step, no server: drop it next to your report artifact or serve both from GitHub Pages. Live examples: [the tool's own report](https://mayageva11.github.io/flakehound/) · [the demo's](https://mayageva11.github.io/flakehound-demo/).
+
+![flakehound dashboard](docs/dashboard.png)
+
+Laid out for the developer staring at a red CI run:
+
+- **New failures first** — clusters absent from the baseline wear a red `NEW` chip, sort to the top, and start expanded; known clusters collapse to one scannable line each (id · error head · occurrences · tests affected).
+- **Signals grouped by verdict** — regression / flaky / needs-data / stable side by side; problem groups start open, the long tail collapsed and lazily rendered, so the page stays fast at 10,000 tests.
+- **Cross-linked** — click a test inside a cluster to jump to its run-by-run history; click a quarantined test's cluster chip to jump to its trace.
+- **Quarantine panel** — every quarantined test shows its progress toward auto-release.
+- **Filter with `/`** — searches test ids, traces, and hypotheses, including inside collapsed groups.
 
 ## Quick start
 
