@@ -4,7 +4,7 @@
 [![ci](https://github.com/mayageva11/flakehound/actions/workflows/ci.yml/badge.svg)](https://github.com/mayageva11/flakehound/actions/workflows/ci.yml)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 ![Node](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-214%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-221%20passing-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
 **Live dashboard:** [mayageva11.github.io/flakehound](https://mayageva11.github.io/flakehound/) — rendered from a real `flakehound.report.json`.
@@ -54,7 +54,11 @@ CI gate: 1 new, 0 known, 0 resolved regression(s)
 
 ## Dashboard
 
-A single static file ([`docs/index.html`](docs/index.html)) renders `flakehound.report.json` — no build step, no server: drop it next to your report artifact or serve both from GitHub Pages. Live examples: [the tool's own report](https://mayageva11.github.io/flakehound/) · [the demo's](https://mayageva11.github.io/flakehound-demo/).
+```sh
+npx flakehound analyze --html    # writes flakehound.report.html next to the JSON
+```
+
+One **self-contained HTML file** with the report embedded — open it from disk (`file://` works, no server), attach it as a CI artifact, or publish it to GitHub Pages. Set a path with `--html <path>` or in config (`html: { output: 'docs/index.html' }`). The dashboard also works the classic way — the same page served next to a `flakehound.report.json` renders that instead. Live examples: [the tool's own report](https://mayageva11.github.io/flakehound/) · [the demo's](https://mayageva11.github.io/flakehound-demo/).
 
 ![flakehound dashboard](docs/dashboard.png)
 
@@ -78,8 +82,8 @@ npm install --save-dev flakehound
 # 3. Scaffold a commented config (optional — sensible defaults otherwise)
 npx flakehound init
 
-# 4. Analyze your run history
-npx flakehound analyze
+# 4. Analyze your run history (--html also emits the dashboard, see below)
+npx flakehound analyze --html
 ```
 
 That's the whole integration: JUnit XML in, root-cause analysis out. No plugins,
@@ -101,6 +105,7 @@ no per-runner adapters, no account.
 | `-i, --input <glob>` | JUnit XML glob (overrides config) |
 | `-b, --baseline <path>` | previous report — regressions in it are *known* and don't re-fail the gate |
 | `--json <path>` | report artifact path (default `flakehound.report.json`) |
+| `--html [path]` | also emit the self-contained HTML dashboard (default `flakehound.report.html`) |
 | `--no-ai` | disable AI interpretation |
 | `-c, --config <path>` | explicit config file |
 
@@ -226,6 +231,9 @@ export default defineConfig({
       createIssues: true,     // one issue per quarantined test (GITHUB_TOKEN)
       repo: 'owner/repo',     // unset = inferred from the origin remote
     },
+  },
+  html: {
+    output: 'flakehound.report.html', // self-contained dashboard (like --html)
   },
 });
 ```

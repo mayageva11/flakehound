@@ -1135,18 +1135,34 @@ function initFilter() {
   });
 }
 
-/* Data fetch — the quarantine state is optional: absence just hides the panel. */
-Promise.all([
-  fetch('flakehound.report.json')
-    .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-    .catch(() => null),
-  fetch('flakehound.quarantine.json')
-    .then((r) => (r.ok ? r.json() : null))
-    .catch(() => null),
-]).then(([report, quarantine]) => {
-  if (report) render(report, quarantine, 'flakehound.report.json');
-  else render(FALLBACK_REPORT, FALLBACK_QUARANTINE, 'demo sample');
-});
+/* Data load. Two sources, in order:
+   1. Embedded — `flakehound analyze --html` bakes the report in as
+      window.FHREPORT (+ optional window.FHQUARANTINE), so the emitted file is
+      self-contained and works from file:// with no server. A live
+      flakehound.quarantine.json next to the file still wins over the embedded
+      snapshot (in CI setups the quarantine step runs after analyze).
+   2. Fetched — the classic layout: this file served next to
+      flakehound.report.json. The quarantine state is optional: absence just
+      hides the panel. */
+const fetchQuarantine = fetch('flakehound.quarantine.json')
+  .then((r) => (r.ok ? r.json() : null))
+  .catch(() => null);
+
+if (window.FHREPORT) {
+  fetchQuarantine.then((live) => {
+    render(window.FHREPORT, live ?? window.FHQUARANTINE ?? null, 'embedded report');
+  });
+} else {
+  Promise.all([
+    fetch('flakehound.report.json')
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .catch(() => null),
+    fetchQuarantine,
+  ]).then(([report, quarantine]) => {
+    if (report) render(report, quarantine, 'flakehound.report.json');
+    else render(FALLBACK_REPORT, FALLBACK_QUARANTINE, 'demo sample');
+  });
+}
 </script>
 </body>
 </html>

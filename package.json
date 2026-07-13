@@ -25,6 +25,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "postbuild": "node -e \"require('node:fs').copyFileSync('docs/index.html', 'dist/dashboard.html')\"",
     "dev": "tsx src/cli.ts",
     "test": "vitest run",
     "test:watch": "vitest",

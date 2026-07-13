@@ -30,6 +30,8 @@ export interface CliOverrides {
   output?: string;
   /** false = --no-ai. */
   ai?: boolean;
+  /** --html: true = emit at the config/default path, string = emit there. */
+  html?: string | true;
 }
 
 export interface LoadConfigOptions {
@@ -108,6 +110,21 @@ function applyOverrides(
     merged['ai'] = {
       ...(typeof fileAi === 'object' && fileAi !== null ? fileAi : {}),
       enabled: false,
+    };
+  }
+  if (overrides.html !== undefined) {
+    const fileHtml = fileConfig['html'];
+    const fileOutput =
+      typeof fileHtml === 'object' && fileHtml !== null
+        ? (fileHtml as Record<string, unknown>)['output']
+        : undefined;
+    merged['html'] = {
+      ...(typeof fileHtml === 'object' && fileHtml !== null ? fileHtml : {}),
+      // Bare --html keeps a config-file path when one exists.
+      output:
+        typeof overrides.html === 'string'
+          ? overrides.html
+          : (fileOutput ?? 'flakehound.report.html'),
     };
   }
   return merged;

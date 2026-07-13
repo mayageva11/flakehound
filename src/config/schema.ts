@@ -74,6 +74,22 @@ export const configSchema = z.object({
   baseline: z.string().min(1).optional(),
   /** Where to write the report artifact. */
   output: z.string().min(1).default('flakehound.report.json'),
+  html: z
+    .object({
+      /**
+       * Where to write the self-contained HTML report (the dashboard with the
+       * report embedded — opens from file://, no server). Unset = not emitted;
+       * the bare `--html` flag defaults it to flakehound.report.html.
+       */
+      output: z.string().min(1).optional(),
+      /**
+       * Extra dashboard settings embedded as window.FHCONFIG. stableRuns is
+       * filled from quarantine.stableRunsToRelease automatically; anything
+       * set here wins.
+       */
+      dashboard: z.record(z.string(), z.unknown()).default({}),
+    })
+    .prefault({}),
 });
 
 /** What users write in flakehound.config.ts (everything optional). */

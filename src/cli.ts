@@ -44,6 +44,10 @@ program
   .option('-b, --baseline <path>', 'previous flakehound.report.json for the CI gate')
   .option('--no-ai', 'disable the AI interpretation layer')
   .option('--json <path>', 'output path for flakehound.report.json')
+  .option(
+    '--html [path]',
+    'also emit a self-contained HTML report (default flakehound.report.html)',
+  )
   .action(
     async (opts: {
       config?: string;
@@ -51,6 +55,7 @@ program
       baseline?: string;
       ai: boolean;
       json?: string;
+      html?: string | true;
     }) => {
       try {
         const { exitCode } = await runAnalyze({
@@ -60,6 +65,7 @@ program
             ...(opts.baseline !== undefined ? { baseline: opts.baseline } : {}),
             ...(opts.json !== undefined ? { output: opts.json } : {}),
             ...(opts.ai === false ? { ai: false } : {}),
+            ...(opts.html !== undefined ? { html: opts.html } : {}),
           },
         });
         process.exitCode = exitCode;

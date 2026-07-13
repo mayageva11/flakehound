@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { interpretClusters } from './ai/index.js';
 import type { HypothesisClient } from './ai/index.js';
@@ -7,7 +8,14 @@ import type { CliOverrides } from './config/load.js';
 import { ingest } from './ingest/index.js';
 import type { TestRun } from './ingest/types.js';
 import { computeSignals } from './signal/index.js';
-import { buildReport, diffAgainstBaseline, loadBaseline, renderReport, writeReport } from './report/index.js';
+import {
+  buildReport,
+  diffAgainstBaseline,
+  loadBaseline,
+  renderReport,
+  writeHtmlReport,
+  writeReport,
+} from './report/index.js';
 import type { FlakehoundReport } from './report/index.js';
 import { FlakehoundError } from './util/errors.js';
 
@@ -102,9 +110,45 @@ export async function runAnalyze(options: RunAnalyzeOptions = {}): Promise<RunAn
 
   const reportPath = path.resolve(cwd, config.output);
   await writeReport(reportPath, report);
+
+  if (config.html.output !== undefined) {
+    const htmlPath = path.resolve(cwd, config.html.output);
+    await writeHtmlReport(htmlPath, {
+      report,
+      ...(await readQuarantineState(path.resolve(cwd, config.quarantine.state), warn)),
+      dashboard: {
+        // Keep the dashboard's release progress in sync with the config that
+        // actually governs auto-release; html.dashboard entries win.
+        stableRuns: config.quarantine.stableRunsToRelease,
+        ...config.html.dashboard,
+      },
+    });
+    log(`HTML report written to ${htmlPath}`);
+  }
+
   log(renderReport(report));
 
   return { report, reportPath, exitCode: gate.newRegressions.length > 0 ? 1 : 0 };
+}
+
+/** The quarantine state is embedded as an optional snapshot — a missing file
+ *  is the normal no-quarantine case, an unreadable one degrades to a warning. */
+async function readQuarantineState(
+  statePath: string,
+  warn: (message: string) => void,
+): Promise<{ quarantine?: unknown }> {
+  let raw: string;
+  try {
+    raw = await readFile(statePath, 'utf8');
+  } catch {
+    return {};
+  }
+  try {
+    return { quarantine: JSON.parse(raw) };
+  } catch {
+    warn(`flakehound: could not parse quarantine state at ${statePath} — omitting it from the HTML report`);
+    return {};
+  }
 }
 
 export function applyHistoryWindow(

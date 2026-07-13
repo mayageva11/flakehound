@@ -89,6 +89,15 @@ export default {
 
   /** Where the report artifact is written. */
   output: 'flakehound.report.json',
+
+  /**
+   * Optional: also emit the dashboard as a single self-contained HTML file
+   * with the report embedded — opens from file://, no server needed.
+   * (Same as passing \`--html\` on the command line.)
+   */
+  // html: {
+  //   output: 'flakehound.report.html',
+  // },
 } satisfies FlakehoundUserConfig;
 `;
 
