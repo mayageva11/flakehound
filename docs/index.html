@@ -202,6 +202,27 @@
   .badge.reg { background: var(--red); color: #0d1117; }
   .badge.flk { background: var(--accent); color: #0d1117; }
   .badge.stb { background: var(--border); color: var(--muted); }
+  .badge.ins { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+
+  /* ── Signal groups: one collapsible section per classification ── */
+  .sig-group { margin-bottom: 10px; }
+  .sig-group.hidden { display: none; }
+  .sig-group-head {
+    display: flex; align-items: center; gap: 8px; width: 100%;
+    background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    padding: 8px 12px; cursor: pointer; color: var(--text); text-align: left;
+  }
+  .sig-group-head:hover { border-color: var(--blue); }
+  .sig-group-head .caret {
+    font-size: 11px; color: var(--muted);
+    display: inline-block; transform: rotate(-90deg); transition: transform 0.15s ease;
+  }
+  .sig-group.open .sig-group-head .caret { transform: rotate(0deg); }
+  .sig-group-count { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .sig-group-hint { font-size: 11px; color: var(--muted); margin-left: auto; }
+  .sig-group-body { display: none; margin-top: 8px; }
+  .sig-group.open .sig-group-body { display: block; }
+  .sig-group-body .sig-row:last-child { margin-bottom: 0; }
   .score-track {
     width: 72px;
     height: 4px;
@@ -227,6 +248,7 @@
 
   .sig-timeline { display: none; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
   .sig-row.expanded .sig-timeline { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .sig-row.flash-highlight { animation: flash 1.5s ease-out; }
   .dot-wrap { position: relative; display: inline-flex; align-items: center; }
   .dot {
     width: 10px; height: 10px; border-radius: 50%;
@@ -266,6 +288,22 @@
   }
   .id-chip:hover { border-color: var(--blue); }
   .c-meta { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .c-tests-toggle {
+    font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums;
+    background: transparent; border: none; padding: 0; cursor: pointer;
+  }
+  .c-tests-toggle:hover { color: var(--blue); }
+  .c-tests-toggle .caret { display: inline-block; font-size: 11px; transition: transform 0.15s ease; }
+  .c-tests-toggle.open .caret { transform: rotate(180deg); }
+  .c-tests { display: none; margin: 8px 0 0; padding: 0; list-style: none; }
+  .c-tests.open { display: block; }
+  .c-tests li {
+    font-family: var(--mono); font-size: 12px; color: var(--text);
+    padding: 3px 8px; margin: 2px 0;
+    border-left: 2px solid var(--border);
+    cursor: pointer;
+  }
+  .c-tests li:hover { border-left-color: var(--blue); color: var(--blue); background: var(--surface); }
   .c-hypo { font-style: italic; color: var(--muted); font-size: 12.5px; margin-top: 8px; cursor: help; }
   pre.c-trace {
     margin: 8px 0 0;
@@ -673,6 +711,48 @@ window.copyClusterId = function (id, btn, ev) {
   }).catch(() => { btn.textContent = id; });
 };
 
+/* Signal-group rows are rendered lazily: collapsed groups (e.g. thousands of
+   stable tests) stay out of the DOM until first expanded, a filter query, or
+   a jump-to-signal forces them in. */
+let signalGroupRows = {};
+
+function ensureGroupRendered(group) {
+  const body = group.querySelector('.sig-group-body');
+  if (body.dataset.rendered) return;
+  body.innerHTML = signalGroupRows[group.dataset.group] || '';
+  body.dataset.rendered = '1';
+}
+
+window.toggleSignalGroup = function (head) {
+  const group = head.closest('.sig-group');
+  ensureGroupRendered(group);
+  group.classList.toggle('open');
+};
+
+window.toggleClusterTests = function (btn, ev) {
+  ev.stopPropagation();
+  const list = btn.closest('.cluster-card').querySelector('.c-tests');
+  const open = list.classList.toggle('open');
+  btn.classList.toggle('open', open);
+};
+
+/* Jump from a cluster's affected-tests list to that test's signal row:
+   scroll, expand the run timeline, and flash — mirrors revealCluster. */
+window.revealSignal = function (testId) {
+  document.querySelectorAll('#signal-list .sig-group').forEach(ensureGroupRendered);
+  const row = [...document.querySelectorAll('.sig-row')].find((r) => r.dataset.testid === testId);
+  if (!row) return;
+  const group = row.closest('.sig-group');
+  if (group) group.classList.add('open');
+  document.querySelectorAll('.sig-row.expanded').forEach((r) => r.classList.remove('expanded'));
+  row.classList.add('expanded');
+  row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  row.classList.remove('flash-highlight');
+  void row.offsetWidth; // reflow so the animation restarts
+  row.classList.add('flash-highlight');
+  setTimeout(() => row.classList.remove('flash-highlight'), 1500);
+};
+
 window.toggleTrace = function (btn) {
   const pre = btn.previousElementSibling;
   const clamped = pre.classList.toggle('clamped');
@@ -687,8 +767,12 @@ function scoreColor(score) {
 }
 
 function signalRow(s, quarantineIdx) {
-  const cls = s.classification === 'regression' ? 'reg' : s.classification === 'flaky' ? 'flk' : 'stb';
-  const label = s.classification === 'regression' ? 'REGRESSION' : s.classification === 'flaky' ? 'FLAKY' : 'STABLE';
+  const cls = s.classification === 'regression' ? 'reg'
+    : s.classification === 'flaky' ? 'flk'
+    : s.classification === 'stable' ? 'stb' : 'ins';
+  const label = s.classification === 'regression' ? 'REGRESSION'
+    : s.classification === 'flaky' ? 'FLAKY'
+    : s.classification === 'stable' ? 'STABLE' : 'NEEDS DATA';
   const fileChip = s.testId.includes(' > ') ? s.testId.split(' > ')[0] : '';
   const search = `${s.testId} ${s.classification} ${s.confidence} ${s.reason ?? ''}`.toLowerCase();
   const dots = (s.history ?? []).map((h) => {
@@ -696,7 +780,7 @@ function signalRow(s, quarantineIdx) {
     return `<span class="dot-wrap" title="${esc(title)}"><span class="dot ${esc(h.verdict)}"></span>${h.retryFlips > 0 ? '<span class="dot-flip">⚡</span>' : ''}</span>`;
   }).join('');
   return `
-    <div class="sig-row" data-search="${esc(search)}" onclick="toggleSignalRow(this)">
+    <div class="sig-row" data-search="${esc(search)}" data-testid="${esc(s.testId)}" onclick="toggleSignalRow(this)">
       <div class="sig-main">
         <span class="badge ${cls}">${label}</span>
         <span class="sig-name" title="${esc(s.testId)}">${esc(s.testId)}</span>
@@ -727,8 +811,11 @@ function clusterCard(c) {
       <div class="cluster-top">
         <button class="id-chip" onclick="copyClusterId('${esc(c.id)}', this, event)" title="Click to copy cluster id">${esc(c.id.slice(0, 8))}</button>
         <span class="c-meta num">${c.occurrences} occurrence${c.occurrences !== 1 ? 's' : ''}</span>
-        <span class="c-meta num">${c.tests.length} test${c.tests.length !== 1 ? 's' : ''} affected</span>
+        <button class="c-tests-toggle num" onclick="toggleClusterTests(this, event)" title="Show the affected tests">${c.tests.length} test${c.tests.length !== 1 ? 's' : ''} affected <span class="caret">▾</span></button>
       </div>
+      <ul class="c-tests">${c.tests.map((t) =>
+        `<li data-testid="${esc(t)}" onclick="revealSignal(this.dataset.testid)" title="Jump to this test's signal row">${esc(t)}</li>`).join('')}
+      </ul>
       ${c.hypothesis
         ? `<div class="c-hypo" title="Interpretive only — does not affect scores, IDs, or CI gate">✦ AI: ${esc(c.hypothesis.explanation)}</div>`
         : DEMO_MODE
@@ -883,12 +970,37 @@ function render(report, quarantine, source) {
       <span class="gate-codes">Exit codes: 0 clean · 1 regression · 2 error</span>
     </div>`);
 
-  /* Signals + clusters split */
-  const sorted = [
-    ...regressions,
-    ...[...flaky].sort((a, b) => b.flakinessScore - a.flakinessScore),
-    ...signals.filter((s) => s.classification !== 'regression' && s.classification !== 'flaky'),
-  ];
+  /* Signals + clusters split.
+     Signals are grouped by classification into collapsible sections, so the
+     panel stays navigable at any suite size: problem groups (regression,
+     flaky) start open, the long tail (needs-data, stable) starts collapsed
+     and its rows are only added to the DOM when first expanded. */
+  const stable = signals.filter((s) => s.classification === 'stable');
+  const needsData = signals.filter((s) => !['regression', 'flaky', 'stable'].includes(s.classification));
+  const byName = (a, b) => a.testId.localeCompare(b.testId);
+  const signalGroups = [
+    { key: 'regression', label: 'REGRESSION', badge: 'reg', hint: 'failing 100% since a specific commit', items: [...regressions].sort(byName), open: regressions.length > 0 },
+    { key: 'flaky', label: 'FLAKY', badge: 'flk', hint: 'ranked by flakiness score', items: [...flaky].sort((a, b) => b.flakinessScore - a.flakinessScore), open: flaky.length > 0 },
+    { key: 'needs-data', label: 'NEEDS DATA', badge: 'ins', hint: 'not enough runs to classify yet', items: [...needsData].sort(byName), open: false },
+    { key: 'stable', label: 'STABLE', badge: 'stb', hint: '', items: [...stable].sort(byName), open: false },
+  ].filter((g) => g.items.length > 0);
+
+  signalGroupRows = {};
+  for (const g of signalGroups) {
+    signalGroupRows[g.key] = g.items
+      .map((s) => signalRow(s, qIndexByTest.has(s.testId) ? qIndexByTest.get(s.testId) : -1)).join('');
+  }
+  const groupHtml = signalGroups.map((g) => `
+    <section class="sig-group${g.open ? ' open' : ''}" data-group="${g.key}"${g.open ? ' data-open-default="1"' : ''}>
+      <button class="sig-group-head" onclick="toggleSignalGroup(this)">
+        <span class="caret">▾</span>
+        <span class="badge ${g.badge}">${g.label}</span>
+        <span class="sig-group-count">${g.items.length} test${g.items.length !== 1 ? 's' : ''}</span>
+        ${g.hint ? `<span class="sig-group-hint">${g.hint}</span>` : ''}
+      </button>
+      <div class="sig-group-body"${g.open ? ' data-rendered="1"' : ''}>${g.open ? signalGroupRows[g.key] : ''}</div>
+    </section>`).join('');
+
   const ranked = [...clusters].sort((a, b) => b.occurrences - a.occurrences);
 
   parts.push(`
@@ -901,9 +1013,9 @@ function render(report, quarantine, source) {
         </div>
         <input class="filter-input" id="filter-input" type="text" placeholder="Filter tests..." autocomplete="off">
         <div id="signal-list">
-          ${sorted.length === 0
+          ${signals.length === 0
             ? '<div class="empty">No test signals yet — run flakehound analyze</div>'
-            : sorted.map((s) => signalRow(s, qIndexByTest.has(s.testId) ? qIndexByTest.get(s.testId) : -1)).join('')}
+            : groupHtml}
         </div>
         <div class="empty hidden" id="sig-no-match">No matching tests</div>
       </section>
@@ -958,10 +1070,23 @@ function initFilter() {
   function apply() {
     const q = input.value.trim().toLowerCase();
     let sigVisible = 0;
-    document.querySelectorAll('#signal-list .sig-row').forEach((row) => {
-      const match = (row.getAttribute('data-search') || '').includes(q);
-      row.classList.toggle('hidden', !match);
-      if (match) sigVisible++;
+    document.querySelectorAll('#signal-list .sig-group').forEach((group) => {
+      if (q) ensureGroupRendered(group); // a query must search collapsed groups too
+      let groupVisible = 0;
+      group.querySelectorAll('.sig-row').forEach((row) => {
+        const match = (row.getAttribute('data-search') || '').includes(q);
+        row.classList.toggle('hidden', !match);
+        if (match) groupVisible++;
+      });
+      sigVisible += groupVisible;
+      if (q) {
+        // While filtering: hide groups with no matches, open the rest.
+        group.classList.toggle('hidden', groupVisible === 0);
+        group.classList.toggle('open', groupVisible > 0);
+      } else {
+        group.classList.remove('hidden');
+        group.classList.toggle('open', group.dataset.openDefault === '1');
+      }
     });
     let cluVisible = 0;
     document.querySelectorAll('#cluster-list .cluster-card').forEach((card) => {
