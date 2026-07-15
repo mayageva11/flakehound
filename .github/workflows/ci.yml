@@ -54,9 +54,12 @@ jobs:
             console.log('action self-test OK:', JSON.stringify(r.gate));
           "
 
-  # cache-baseline on a fresh runner: no prior cache exists, so the restore is a
-  # miss and the run must be identical to the fail-safe path (baselineUsed=false,
-  # every regression new). Proves the new cache wiring never changes the verdict.
+  # cache-baseline with a per-run-unique prefix: nothing was ever saved under it,
+  # so the restore deterministically misses and the run must be identical to the
+  # fail-safe path (baselineUsed=false, every regression new). Proves the cache
+  # wiring never changes the verdict on a miss. (A static prefix would restore a
+  # prior run's baseline via restore-keys — that's the feature working, but not
+  # what this job asserts.)
   action-cache-self-test:
     runs-on: ubuntu-latest
     steps:
@@ -68,6 +71,7 @@ jobs:
           no-ai: 'true'
           fail-on-new-regressions: 'false'
           cache-baseline: 'true'
+          cache-key-prefix: flakehound-selftest-${{ github.run_id }}
       - name: Assert fail-safe verdict on a cache miss
         run: |
           test "${{ steps.flakehound.outputs.exit-code }}" = "1" || { echo "expected exit-code 1, got '${{ steps.flakehound.outputs.exit-code }}'"; exit 1; }

@@ -1,5 +1,5 @@
-import { writeFile } from 'node:fs/promises';
 import type { CallExpression, Node as TsNode, SourceFile } from 'ts-morph';
+import { writeFileAtomic } from '../../util/atomic-write.js';
 import { buildMarkerComment, isMarkerComment, parseMarkerComment } from '../marker.js';
 import { QUARANTINE_TAG } from '../types.js';
 import type {
@@ -68,7 +68,7 @@ export class PlaywrightAnnotator implements QuarantineAnnotator {
       sourceFile.insertText(statement.getStart(), `${buildMarkerComment(marker)}\n${indent}`);
     }
 
-    if (!opts.dryRun) await writeFile(target.filePath, sourceFile.getFullText(), 'utf8');
+    if (!opts.dryRun) await writeFileAtomic(target.filePath, sourceFile.getFullText());
     return { status: 'annotated', filePath: target.filePath };
   }
 
@@ -99,7 +99,7 @@ export class PlaywrightAnnotator implements QuarantineAnnotator {
       }
     }
 
-    if (!opts.dryRun) await writeFile(target.filePath, text, 'utf8');
+    if (!opts.dryRun) await writeFileAtomic(target.filePath, text);
     return { status: 'annotated', filePath: target.filePath };
   }
 

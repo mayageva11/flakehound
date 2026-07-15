@@ -263,6 +263,12 @@ export async function runQuarantine(
     if (result.status === 'annotated' || result.status === 'already-annotated') {
       quarantinedNow.push(withIssue);
     } else {
+      // The issue was filed before the (now-failed) edit — roll it back so a
+      // re-run doesn't file a duplicate. Best-effort: a close failure still
+      // leaves the test skipped.
+      if (issue !== undefined && github !== undefined) {
+        await closeQuarantineIssue(github.client, github.repo, issue, signal.testId, warn);
+      }
       skipped.push({ testId: signal.testId, reason: result.detail });
       warn(`flakehound: skipping '${signal.testId}' — ${result.detail}`);
     }
