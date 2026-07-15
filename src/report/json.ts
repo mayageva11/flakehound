@@ -1,4 +1,4 @@
-import { writeFile } from 'node:fs/promises';
+import { writeFileAtomic } from '../util/atomic-write.js';
 import type { InterpretedCluster } from '../ai/types.js';
 import type { TestSignal } from '../signal/types.js';
 import type { FlakehoundReport, GateResult, ReportSummary } from './types.js';
@@ -22,5 +22,5 @@ export function buildReport(parts: {
 }
 
 export async function writeReport(filePath: string, report: FlakehoundReport): Promise<void> {
-  await writeFile(filePath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
+  await writeFileAtomic(filePath, `${JSON.stringify(report, null, 2)}\n`);
 }

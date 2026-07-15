@@ -154,14 +154,27 @@ follow-up job on it, or run `npx flakehound quarantine --pr` yourself). Set
 input is strictly read-only reporting: the job summary and PR comment gain a
 "⊘ Quarantine (dry-run)" section, and your repo is never modified.
 
+Set `cache-baseline: 'true'` and the action persists the report across runs for
+you — no hand-rolled `actions/cache` — using a concurrency-safe key scheme (see
+[Concurrency & the CI cache](#concurrency--the-ci-cache)). `cache-key-prefix`
+(default `flakehound-report`) names the cache; branch and run id are appended.
+
 ### GitHub Actions — raw CLI
 
-Baseline persistence via the cache:
+Baseline persistence via the cache. The key is **unique per run** (so concurrent
+branches or matrix jobs never overwrite each other) and `restore-keys`
+**prefix-matches the newest** prior report for the branch, then any branch in
+scope — an append-only cache log, not a single mutable slot:
 
 ```yaml
 - name: Restore previous flakehound report
   uses: actions/cache/restore@v4
-  with: { path: flakehound.report.json, key: flakehound-report }
+  with:
+    path: flakehound.report.json
+    key: flakehound-report-${{ github.ref_name }}-${{ github.run_id }}-${{ github.run_attempt }}
+    restore-keys: |
+      flakehound-report-${{ github.ref_name }}-
+      flakehound-report-
 
 - name: flakehound gate
   run: npx flakehound analyze --input 'test-results/**/*.xml' --baseline flakehound.report.json
@@ -169,8 +182,12 @@ Baseline persistence via the cache:
 - name: Save report for next run
   if: always()
   uses: actions/cache/save@v4
-  with: { path: flakehound.report.json, key: flakehound-report-${{ github.run_id }} }
+  with:
+    path: flakehound.report.json
+    key: flakehound-report-${{ github.ref_name }}-${{ github.run_id }}-${{ github.run_attempt }}
 ```
+
+(The reusable action does all of this for you with `cache-baseline: 'true'`.)
 
 ### Jenkins (declarative pipeline)
 
@@ -194,6 +211,43 @@ else if (rc == 2) { unstable 'flakehound: tool error' }
 The one non-obvious choice is `lastCompleted()` rather than `lastSuccessful()`: a build that failed *because of* a new regression still archived its report, and that report is exactly what turns the regression from "new" (fails every build) into "known" (fails once, stays visible).
 
 No baseline anywhere (first run, cache miss, missing artifact)? flakehound **fails safe**: every regression counts as new.
+
+### Concurrency & the CI cache
+
+flakehound's history is already **collision-free by construction**: each run's
+JUnit XML lands under a unique `{sha}_{timestamp}/` path, and `analyze` reads the
+whole folder and writes a fresh report — there is no single accumulating file for
+two runs to fight over *inside the tool*. The only place a race can appear is the
+**transport** you use to carry the previous report forward as the baseline, when
+many jobs (parallel branches, PRs, matrix legs) funnel through **one static cache
+key**:
+
+| Transport | Static key behaviour | Fix |
+|-----------|----------------------|-----|
+| **GitLab CI cache** | Re-uploads the archive → **last-writer-wins**: the job that finishes last clobbers the others' baseline. | Per-run key + prefix restore. |
+| **GitHub Actions cache** | Keys are **immutable** → a repeat save is a silent no-op, so the baseline **freezes on the first run** and never advances. | Per-run key + `restore-keys`. |
+| **Jenkins artifacts** | `archiveArtifacts` is immutable per build; `copyArtifacts lastCompleted()` reads the newest. | Already safe — no change. |
+
+The fix in every case is the same idiom the examples above use: **save under a
+unique, never-reused key** (so no writer can overwrite another) and **restore the
+newest match via a prefix** (so the baseline always moves forward). The reusable
+action's `cache-baseline: 'true'` does exactly this.
+
+GitLab equivalent:
+
+```yaml
+flakehound:
+  cache:
+    key: "flakehound-report-$CI_COMMIT_REF_SLUG"   # per-branch slot
+    paths: [flakehound.report.json]
+  script:
+    - mv flakehound.report.json flakehound.baseline.json 2>/dev/null || true
+    - npx flakehound analyze --input 'test-results/**/*.xml'
+        --baseline flakehound.baseline.json --json flakehound.report.json
+```
+
+Per-branch `key` isolates concurrent branches so they can't clobber each other;
+within a branch GitLab serializes cache upload, so the newest run wins cleanly.
 
 ## Configuration
 

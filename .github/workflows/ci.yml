@@ -53,3 +53,27 @@ jobs:
             if (r.clusters.length !== 2) throw new Error('expected 2 clusters');
             console.log('action self-test OK:', JSON.stringify(r.gate));
           "
+
+  # cache-baseline on a fresh runner: no prior cache exists, so the restore is a
+  # miss and the run must be identical to the fail-safe path (baselineUsed=false,
+  # every regression new). Proves the new cache wiring never changes the verdict.
+  action-cache-self-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - id: flakehound
+        uses: ./
+        with:
+          input-glob: 'tests/fixtures/e2e/*/junit.xml'
+          no-ai: 'true'
+          fail-on-new-regressions: 'false'
+          cache-baseline: 'true'
+      - name: Assert fail-safe verdict on a cache miss
+        run: |
+          test "${{ steps.flakehound.outputs.exit-code }}" = "1" || { echo "expected exit-code 1, got '${{ steps.flakehound.outputs.exit-code }}'"; exit 1; }
+          node -e "
+            const r = require('./${{ steps.flakehound.outputs.report-path }}');
+            if (r.gate.baselineUsed !== false) throw new Error('cache miss must fail safe (baselineUsed=false)');
+            if (r.gate.newRegressions.length !== 1) throw new Error('expected 1 new regression');
+            console.log('cache self-test OK:', JSON.stringify(r.gate));
+          "
