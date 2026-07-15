@@ -9,7 +9,7 @@
 
 **Live dashboard:** [mayageva11.github.io/flakehound](https://mayageva11.github.io/flakehound/) — rendered from a real `flakehound.report.json`.
 
-**Jump to:** [Quick start](#quick-start) · [Commands](#commands) · [Dashboard](#dashboard) · [CI integration](#ci-integration) · [Configuration](#configuration) · [Quarantine](#quarantine) · [Architecture](#architecture)
+**Jump to:** [Quick start](#quick-start) · [Commands](#commands) · [Dashboard](#dashboard) · [CI integration](#ci-integration) · [Configuration](#configuration) · [Quarantine](#quarantine) · [Architecture](#architecture) · [Changelog](#changelog)
 
 **Root-cause analysis for flaky tests.** Existing tools count pass/fail and tell you *that* a test is flaky — flakehound clusters failures by their underlying cause and tells you **"23 failures over 3 weeks = 4 unique bugs"**, separates genuinely flaky tests from hard regressions, and gates your CI on *new* regressions only.
 
@@ -432,6 +432,34 @@ src/
 - **Flakiness ≠ fail rate.** A test failing 100% of the time isn't flaky — it's broken. Scoring counts pass↔fail *transitions* on the same commit (and retry flips within a run), and the regression classifier runs first, mutually exclusive.
 - **Graceful degradation as a contract.** Missing metadata is a first-class case: signals downgrade confidence and say why, instead of guessing or crashing.
 - **A QA tool practices what it preaches.** Every non-trivial module is unit-tested (214 tests), including shuffled-input determinism and exact threshold boundaries.
+
+## Changelog
+
+### 0.5.0
+
+**Concurrency-safe baseline persistence, atomic writes, and a robustness pass.**
+
+- **New: `cache-baseline` action input.** The GitHub Action now persists and
+  restores the baseline report for you via `actions/cache` — no hand-rolled
+  caching, nothing to commit. It uses an immutable per-run key + `restore-keys`
+  prefix, so parallel branches, PRs, and matrix legs never overwrite each other's
+  baseline. PRs read your default branch's baseline but only ever write to their
+  own branch-scoped key (named by `cache-key-prefix`) — see
+  [Branch isolation](#branch-isolation--prs-read-main-but-write-only-to-themselves).
+- **Atomic writes everywhere.** The report, quarantine state, HTML dashboard, and
+  quarantine spec-file edits now write via a temp file + rename, so a crash or a
+  concurrent reader never sees a torn or corrupt file.
+- **Fixed: PR-comment upsert on busy PRs.** The comment step no longer hard-fails
+  (or posts a duplicate) when a pull request has paginated comments.
+- **Fixed: orphan GitHub issues.** If a quarantine edit fails *after* the tracking
+  issue was filed, the issue is now rolled back (closed) so a re-run won't
+  duplicate it.
+- **Hardened: the AI layer never crashes the run.** A provider-init failure now
+  degrades to "no hypotheses", honoring the documented guarantee.
+- **CI actions on node24** — `checkout`/`setup-node` v7, `cache` v6 (drops the
+  Node 20 deprecation warning).
+
+Full detail in the [v0.5.0 release notes](https://github.com/mayageva11/flakehound/releases/tag/v0.5.0).
 
 ## Development
 
