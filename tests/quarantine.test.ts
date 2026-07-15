@@ -8,6 +8,7 @@ import type { IssueClient } from '../src/quarantine/github.js';
 import type { GitRunner } from '../src/quarantine/git.js';
 import { runQuarantine } from '../src/quarantine/run.js';
 import { QUARANTINE_TAG } from '../src/quarantine/types.js';
+import type { QuarantineAnnotator } from '../src/quarantine/types.js';
 import type { FlakehoundReport } from '../src/report/types.js';
 import type { HistoryEntry, TestSignal } from '../src/signal/types.js';
 import { FlakehoundError } from '../src/util/errors.js';
@@ -178,6 +179,40 @@ describe('flakehound quarantine — end to end', () => {
       clusterId: 'abc123def456',
       issue: { number: 12, url: 'https://github.com/o/r/issues/12' },
     });
+  });
+
+  it('rolls back the filed issue when the real edit fails after the probe', async () => {
+    await writeReport([flakySignal()]);
+    const { client, create, update } = mockGithub();
+    // Probe (dry-run) passes so the issue gets filed, then the real write fails
+    // — exercising the orphan-issue rollback path.
+    const annotator: QuarantineAnnotator = {
+      name: 'fake',
+      tag: QUARANTINE_TAG,
+      quarantine: async (target, _marker, opts) =>
+        opts.dryRun
+          ? { status: 'annotated', filePath: target.filePath }
+          : { status: 'not-found', detail: 'simulated write failure' },
+      release: async () => ({ status: 'already-annotated' }),
+      readMarker: async () => undefined,
+    };
+
+    const result = await runQuarantine({
+      cwd: projectDir,
+      mode: 'apply',
+      github: client,
+      annotator,
+      ...silent,
+    });
+
+    expect(result.quarantined).toEqual([]);
+    expect(create).toHaveBeenCalledTimes(1);
+    // The just-filed issue #12 is closed so a re-run won't duplicate it.
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ issue_number: 12, state: 'closed' }));
+    const state = JSON.parse(
+      await readFile(path.join(projectDir, 'flakehound.quarantine.json'), 'utf8'),
+    );
+    expect(state.quarantined).toEqual([]);
   });
 
   it('a second apply run is a no-op with exit 0', async () => {

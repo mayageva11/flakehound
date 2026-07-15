@@ -88,8 +88,16 @@ function anthropicOrSkip(
     info('flakehound: AI interpretation skipped — ANTHROPIC_API_KEY is not set');
     return undefined;
   }
-  const resolved = client ?? (new Anthropic({ apiKey }) as unknown as HypothesisClient);
-  return new AnthropicProvider(resolved, config, warn);
+  try {
+    const resolved = client ?? (new Anthropic({ apiKey }) as unknown as HypothesisClient);
+    return new AnthropicProvider(resolved, config, warn);
+  } catch (cause) {
+    const detail = cause instanceof Error ? cause.message : String(cause);
+    info(
+      `flakehound: could not initialize the Anthropic provider (${detail}) — continuing without AI interpretation`,
+    );
+    return undefined;
+  }
 }
 
 /**
