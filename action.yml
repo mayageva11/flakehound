@@ -79,7 +79,7 @@ runs:
     # is new). Requires actions/cache to be available on the runner.
     - name: Restore baseline cache
       if: inputs.cache-baseline == 'true'
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v6
       with:
         path: ${{ runner.temp }}/flakehound-cache/flakehound.report.json
         key: ${{ inputs.cache-key-prefix }}-${{ github.ref_name }}-${{ github.run_id }}-${{ github.run_attempt }}
@@ -125,7 +125,7 @@ runs:
         cp "${{ inputs.report-path }}" "${{ runner.temp }}/flakehound-cache/flakehound.report.json"
     - name: Persist baseline cache
       if: always() && inputs.cache-baseline == 'true' && steps.analyze.outputs.exit-code != '2'
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v6
       with:
         path: ${{ runner.temp }}/flakehound-cache/flakehound.report.json
         key: ${{ inputs.cache-key-prefix }}-${{ github.ref_name }}-${{ github.run_id }}-${{ github.run_attempt }}
