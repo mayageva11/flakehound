@@ -154,10 +154,37 @@ follow-up job on it, or run `npx flakehound quarantine --pr` yourself). Set
 input is strictly read-only reporting: the job summary and PR comment gain a
 "⊘ Quarantine (dry-run)" section, and your repo is never modified.
 
-Set `cache-baseline: 'true'` and the action persists the report across runs for
-you — no hand-rolled `actions/cache` — using a concurrency-safe key scheme (see
-[Concurrency & the CI cache](#concurrency--the-ci-cache)). `cache-key-prefix`
-(default `flakehound-report`) names the cache; branch and run id are appended.
+**Zero-config baseline persistence.** Set `cache-baseline: 'true'` and the action
+restores the previous report *before* the run and saves the new one *after* — no
+hand-rolled `actions/cache`, and nothing to commit. It uses a concurrency-safe,
+branch-isolated key scheme (proof in
+[Concurrency & the CI cache](#concurrency--the-ci-cache)): a PR reads your default
+branch's baseline but only ever writes to its **own** branch-scoped key, so it can
+never pollute `main`. `cache-key-prefix` (default `flakehound-report`) names the
+cache; the branch, run id, and attempt are appended automatically.
+
+A complete, copy-pasteable workflow — this is the whole setup:
+
+```yaml
+# .github/workflows/flakehound.yml
+name: flakehound
+on: [push, pull_request]
+
+jobs:
+  flaky-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci
+      - name: Run tests → JUnit XML
+        run: npm test              # emit reports into test-results/**/*.xml
+        continue-on-error: true    # a failing test must still reach flakehound
+      - uses: mayageva11/flakehound@main
+        with:
+          input-glob: 'test-results/**/*.xml'
+          cache-baseline: 'true'   # persist + restore the baseline for you
+          comment: 'true'          # upsert one PR-comment verdict
+```
 
 ### GitHub Actions — raw CLI
 
@@ -232,6 +259,29 @@ The fix in every case is the same idiom the examples above use: **save under a
 unique, never-reused key** (so no writer can overwrite another) and **restore the
 newest match via a prefix** (so the baseline always moves forward). The reusable
 action's `cache-baseline: 'true'` does exactly this.
+
+#### Branch isolation — PRs read `main`, but write only to themselves
+
+The key embeds `github.ref_name` and GitHub's cache **scope** model does the rest,
+so pull requests and your default branch never cross-pollinate:
+
+- **Read (PR → `main`):** a PR's `restore-keys` fall back from its own branch
+  prefix to the shared `flakehound-report-` prefix. GitHub lets a run restore
+  caches from its own branch **plus the base/default branch**, so on a PR's first
+  run that fallback resolves to `main`'s newest baseline — the PR diffs against the
+  stable line automatically, no configuration.
+- **Write (PR → its own scope only):** every save uses a unique, branch-scoped key
+  (`…-<ref_name>-<run_id>-<run_attempt>`) written into the run's **own** ref scope.
+  A PR **cannot overwrite, delete, or pollute** `main`'s cache: GitHub isolates
+  cache writes by ref, so even a byte-identical key would land in a *separate*
+  scope — and here the key string differs anyway.
+- **`main` stays clean:** a run on `main` can only read `main`'s own caches — it can
+  never see a PR or feature-branch cache — so a PR's report can never leak *into*
+  the stable baseline either.
+
+Net effect: a PR reads the `main` baseline, writes only to itself, and two
+concurrent PRs (or matrix legs) are mutually invisible. The isolation is enforced
+by the platform, not just by the key naming.
 
 GitLab equivalent:
 
