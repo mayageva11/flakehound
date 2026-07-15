@@ -4,7 +4,7 @@
 [![ci](https://github.com/mayageva11/flakehound/actions/workflows/ci.yml/badge.svg)](https://github.com/mayageva11/flakehound/actions/workflows/ci.yml)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 ![Node](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-221%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-227%20passing-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
 **Live dashboard:** [mayageva11.github.io/flakehound](https://mayageva11.github.io/flakehound/) — rendered from a real `flakehound.report.json`.
