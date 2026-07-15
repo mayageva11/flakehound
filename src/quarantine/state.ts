@@ -1,5 +1,6 @@
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { z } from 'zod';
+import { writeFileAtomic } from '../util/atomic-write.js';
 import { FlakehoundError } from '../util/errors.js';
 import type { QuarantineState } from './types.js';
 
@@ -65,5 +66,5 @@ export async function writeState(filePath: string, state: QuarantineState): Prom
     version: 1,
     quarantined: [...state.quarantined].sort((a, b) => (a.testId < b.testId ? -1 : 1)),
   };
-  await writeFile(filePath, `${JSON.stringify(sorted, null, 2)}\n`, 'utf8');
+  await writeFileAtomic(filePath, `${JSON.stringify(sorted, null, 2)}\n`);
 }

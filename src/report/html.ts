@@ -1,4 +1,5 @@
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
+import { writeFileAtomic } from '../util/atomic-write.js';
 import { FlakehoundError } from '../util/errors.js';
 import type { FlakehoundReport } from './types.js';
 
@@ -56,5 +57,5 @@ export function injectReport(template: string, data: HtmlReportData): string {
 
 export async function writeHtmlReport(filePath: string, data: HtmlReportData): Promise<void> {
   const template = await loadTemplate();
-  await writeFile(filePath, injectReport(template, data), 'utf8');
+  await writeFileAtomic(filePath, injectReport(template, data));
 }

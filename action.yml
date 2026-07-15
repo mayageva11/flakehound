@@ -15,6 +15,17 @@ inputs:
     description: Path to the previous flakehound.report.json (regressions in it are known)
     required: false
     default: ''
+  cache-baseline:
+    description: >-
+      Persist the report across runs via actions/cache and feed it back as the
+      baseline ('true'/'false'). Uses an immutable per-run key + restore-keys
+      prefix, so concurrent branches/matrix jobs never overwrite each other.
+    required: false
+    default: 'false'
+  cache-key-prefix:
+    description: Base of the baseline cache key (branch + run id are appended)
+    required: false
+    default: flakehound-report
   report-path:
     description: Where to write the report artifact
     required: false
@@ -61,13 +72,35 @@ runs:
         npm ci --silent
         npm run build --silent
 
+    # Restore the newest prior report. The primary key is unique per run, so it
+    # never matches (its point is the *save* below); restore-keys prefix-matches
+    # the newest cache on this branch, then the newest anywhere in scope. A miss
+    # leaves no file → the Analyze step falls back to fail-safe (every regression
+    # is new). Requires actions/cache to be available on the runner.
+    - name: Restore baseline cache
+      if: inputs.cache-baseline == 'true'
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ runner.temp }}/flakehound-cache/flakehound.report.json
+        key: ${{ inputs.cache-key-prefix }}-${{ github.ref_name }}-${{ github.run_id }}-${{ github.run_attempt }}
+        restore-keys: |
+          ${{ inputs.cache-key-prefix }}-${{ github.ref_name }}-
+          ${{ inputs.cache-key-prefix }}-
+
     - name: Analyze
       id: analyze
       shell: bash
       run: |
         set +e
         args=(analyze --input "${{ inputs.input-glob }}" --json "${{ inputs.report-path }}")
-        [ -n "${{ inputs.baseline }}" ] && args+=(--baseline "${{ inputs.baseline }}")
+        # Explicit baseline wins; otherwise fall back to the restored cache file
+        # (present only on a cache hit). Either way, a missing file = no --baseline.
+        baseline="${{ inputs.baseline }}"
+        cache_file="${{ runner.temp }}/flakehound-cache/flakehound.report.json"
+        if [ -z "$baseline" ] && [ "${{ inputs.cache-baseline }}" = "true" ] && [ -f "$cache_file" ]; then
+          baseline="$cache_file"
+        fi
+        [ -n "$baseline" ] && args+=(--baseline "$baseline")
         [ "${{ inputs.no-ai }}" = "true" ] && args+=(--no-ai)
         node "$GITHUB_ACTION_PATH/dist/cli.js" "${args[@]}"
         rc=$?
@@ -77,6 +110,25 @@ runs:
         if [ "$rc" -eq 2 ]; then exit 2; fi
         if [ "$rc" -eq 1 ] && [ "${{ inputs.fail-on-new-regressions }}" = "true" ]; then exit 1; fi
         exit 0
+
+    # Stage the fresh report into the cache path, then save it under the unique
+    # per-run key. Unique key ⇒ two concurrent runs never write the same entry
+    # (no last-writer-wins on GitLab-style caches, no immutable no-op on GitHub),
+    # and the next run's restore-keys picks it up as the newest. always() so a
+    # gating regression (exit 1) still persists its report — that's what turns
+    # the regression from "new" into "known" next run.
+    - name: Save baseline cache
+      if: always() && inputs.cache-baseline == 'true' && steps.analyze.outputs.exit-code != '2'
+      shell: bash
+      run: |
+        mkdir -p "${{ runner.temp }}/flakehound-cache"
+        cp "${{ inputs.report-path }}" "${{ runner.temp }}/flakehound-cache/flakehound.report.json"
+    - name: Persist baseline cache
+      if: always() && inputs.cache-baseline == 'true' && steps.analyze.outputs.exit-code != '2'
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ runner.temp }}/flakehound-cache/flakehound.report.json
+        key: ${{ inputs.cache-key-prefix }}-${{ github.ref_name }}-${{ github.run_id }}-${{ github.run_attempt }}
 
     - name: Quarantine (dry-run)
       id: quarantine
